@@ -1,15 +1,14 @@
 import { StyleSheet, Text, View } from 'react-native'
 import React from 'react'
-import LoginPage from './src/screens/LoginPage'
 
-const App = () => {
+const HelpPage = () => {
   return (
     <View>
-      <LoginPage/>
+      <Text>HelpPage</Text>
     </View>
   )
 }
 
-export default App
+export default HelpPage
 
 const styles = StyleSheet.create({})

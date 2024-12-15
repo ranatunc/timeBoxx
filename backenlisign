@@ -1,17 +1,18 @@
-import React, { useState } from "react";
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image, Alert } from "react-native";
+import React, { useState } from 'react';
+import { StyleSheet } from 'react-native';  
+import { Text, View, TextInput, TouchableOpacity, Image, Alert } from 'react-native';
 
-export default function App() {
-  const [username, setUsername] = useState(''); 
-  const [password, setPassword] = useState(''); 
-  const [mail, setMail]= useState('')
+const LoginPage = () => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [mail, setMail] = useState('');
 
   const handleLogin = async () => {
     if (!username || !password || !mail) {
-      Alert.alert("Error", "Please fill in all fields!");
+      Alert.alert('Error', 'Please fill in all fields!');
       return;
     }
-  
+
     try {
       const response = await fetch('http://localhost:3000/api/register', {
         method: 'POST',
@@ -20,44 +21,39 @@ export default function App() {
         },
         body: JSON.stringify({ username, password, mail }),
       });
-  
+
       const data = await response.json();
-      console.log('Response:', response); // Tüm response nesnesini yazdırıyoruz
-      console.log('Response Data:', data); // Gelen veriyi yazdırıyoruz
-  
+      console.log('Response:', response);
+      console.log('Response Data:', data);
+
       if (response.ok) {
         Alert.alert('Success', `Welcome ${data.user.username}!`);
       } else {
         Alert.alert('Error', data.message);
       }
     } catch (error) {
-      console.log('Error:', error); // Hata mesajlarını konsola yazdırdık
+      console.log('Error:', error);
       Alert.alert('Error', 'Unable to connect to server.');
     }
   };
-  
-  
+
   return (
     <View style={styles.container}>
-      <Image
-        source={require('./assets/logın/logo.jpg')} 
-        style={styles.image}
-      />
-      
+      <Image style={styles.image} source={require('../../assets/login/logo.jpg')} />
       <View style={styles.bottomContainer}>
         <TextInput
           placeholder="Username"
           style={styles.input}
           placeholderTextColor="#C2F7DA"
           value={username}
-          onChangeText={setUsername} // Kullanıcı adı güncelleme işlemi yapıyoruz
+          onChangeText={setUsername}
         />
         <TextInput
           placeholder="Mail"
           style={styles.input}
           placeholderTextColor="#C2F7DA"
           value={mail}
-          onChangeText={setMail} 
+          onChangeText={setMail}
         />
         <TextInput
           placeholder="Password"
@@ -65,7 +61,7 @@ export default function App() {
           placeholderTextColor="#C2F7DA"
           secureTextEntry
           value={password}
-          onChangeText={setPassword} // Şifre güncelleme işlemi yapıyoruz
+          onChangeText={setPassword}
         />
         <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
           <Text style={styles.loginButtonText}>KAYIT OL</Text>
@@ -74,19 +70,21 @@ export default function App() {
       </View>
     </View>
   );
-}
+};
+
+export default LoginPage;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#1E1E1E', 
+    backgroundColor: '#1E1E1E',
   },
   image: {
-    width: 150,  
-    height: 150, 
-    marginBottom: 150, 
+    width: 200,
+    height: 200,
+    marginBottom: 20,
     borderRadius: 75,
   },
   bottomContainer: {
