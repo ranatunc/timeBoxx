@@ -9,24 +9,54 @@ const LoginPage = ({ setIsLoggedIn }) => {
   const navigation = useNavigation();
 
   const handleLogin = async () => {
+    
     if (!username || !password) {
-      Alert.alert('Error', 'Please fill in all fields!');
+      Alert.alert('Hata', 'Lütfen tüm alanları doldurun!');
       return;
     }
-
-    // Kullanıcı adı ve şifre kontrolü
-    if (username === 'Admin' && password === '1234') {
-      try {
-        await AsyncStorage.setItem('user', JSON.stringify({ username }));
-        setIsLoggedIn(true);  // Kullanıcı giriş yaptıktan sonra oturum durumunu güncelle
-        navigation.navigate('Home');
-      } catch (error) {
-        console.log('Error saving data', error);
+    try {
+      const response = await fetch('http://localhost:3000/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      
+      const data = await response.json();
+  
+      if (data.user) {
+        await AsyncStorage.setItem('user', JSON.stringify(data.user)); // Kullanıcı bilgisini sakla
+        await AsyncStorage.setItem('userId', data.user._id);
+        await AsyncStorage.setItem('username', data.user.username);
+        setIsLoggedIn(true);
+        navigation.navigate('Home'); // Profili aç
+      } else {
+        alert('Hatalı giriş!');
       }
-    } else {
-      Alert.alert('Error', 'Invalid credentials!');
+    }catch (error) {      
+      if (error.response) {
+        if (error.response.status === 401) {
+          // Geçersiz kullanıcı adı veya şifre hatasını Türkçeleştiriyoruz
+          const errorMessage = error.response.data.message === 'Invalid credentials' 
+            ? 'Geçersiz kullanıcı adı veya şifre!' 
+            : error.response.data.message;
+          
+          Alert.alert('Hata', errorMessage); // Kullanıcıya Türkçe hata mesajını gösteriyoruz
+        } else {
+          const errorMessage = `Bir hata oluştu: ${error.response.statusText}`;
+          Alert.alert('Hata', errorMessage); // Diğer hata mesajlarını da Türkçeleştirebiliriz
+        }
+      } else if (error.request) {
+        console.error('Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.');
+        Alert.alert('Hata', 'Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.');
+      } else {
+        console.error('Bir hata oluştu:', error.message);
+        Alert.alert('Hata', 'Bir hata oluştu. Lütfen tekrar deneyin.');
+      }
     }
+    
+    
   };
+  
 
   const goToSignup = () => {
     navigation.navigate('Signup');  // Signup sayfasına yönlendir
@@ -34,17 +64,17 @@ const LoginPage = ({ setIsLoggedIn }) => {
 
   return (
     <View style={styles.container}>
-      <Image style={styles.image} source={require('../../assets/login/logo.jpg')} />
+      <Image style={styles.image} source={require('/Users/ranatunc/timeBoxx/assets/login/logo.jpg')} />
       <View style={styles.bottomContainer}>
         <TextInput
-          placeholder="Username"
+          placeholder="Kullanıcı Adı"
           style={styles.input}
           placeholderTextColor="#C2F7DA"
           value={username}
           onChangeText={setUsername}
         />
         <TextInput
-          placeholder="Password"
+          placeholder="Şifre"
           style={styles.input}
           placeholderTextColor="#C2F7DA"
           secureTextEntry

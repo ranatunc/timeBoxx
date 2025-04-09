@@ -1,0 +1,125 @@
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { Calendar } from 'react-native-calendars';
+import { SvgXml } from 'react-native-svg';
+import { useNavigation, useRoute } from '@react-navigation/native';
+
+const notificationIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0110 10c0 5.6-4.4 10-10 10S2 17.6 2 12A10 10 0 0112 2zm0 18c4.4 0 8-3.6 8-8s-3.6-8-8-8-8 3.6-8 8 3.6 8 8 8zm-1-5v2h2v-2h-2zm-1-8c0-1.1.9-2 2-2s2 .9 2 2v5h-2V7h-2v5h2V7z"></path></svg>';
+const plusIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0110 10c0 5.6-4.4 10-10 10S2 17.6 2 12A10 10 0 0112 2zm1 10h4v2h-4v4h-2v-4H7v-2h4V8h2v4z"></path></svg>';
+
+const HomePage = () => {
+  const navigation = useNavigation();
+  const route = useRoute();
+
+  const [markedDates, setMarkedDates] = useState({
+    '2025-01-03': { selected: true, marked: true, selectedColor: '#28A745' },
+    '2025-01-26': { marked: true, dotColor: '#28A745' },
+  });
+
+  useEffect(() => {
+    if (route.params?.markedDate) {
+      const { date, color } = route.params.markedDate;
+      if (date) {
+        setMarkedDates((prev) => ({
+          ...prev,
+          [date]: { selected: true, marked: true, selectedColor: color },
+        }));
+      }
+    }
+  }, [route.params]);
+
+  const handleDayPress = (day) => {
+    setMarkedDates((prev) => ({
+      ...prev,
+      [day.dateString]: { selected: true, marked: true, selectedColor: '#28A745' },
+    }));
+  };
+
+  return (
+    <View style={styles.container}>
+      {/* Başlık */}
+      <Text style={styles.header}>Etkinlik Takvimi</Text>
+
+      {/* Takvim */}
+      <Calendar
+        style={styles.calendar}
+        theme={{
+          backgroundColor: '#ECEDF0',
+          calendarBackground: '#ffffff',
+          textSectionTitleColor: '#000',
+          selectedDayBackgroundColor: '#28A745',
+          selectedDayTextColor: '#ffffff',
+          todayTextColor: '#28A745',
+          dayTextColor: '#000',
+          arrowColor: '#28A745',
+          monthTextColor: '#000',
+          textDayFontSize: 14,
+          textMonthFontSize: 16,
+          textDayHeaderFontSize: 12,
+        }}
+        markedDates={markedDates}
+        onDayPress={handleDayPress}
+      />
+
+      {/* İkonlar */}
+      <View style={styles.iconContainer}>
+        <TouchableOpacity style={styles.iconButton}>
+          <SvgXml xml={notificationIcon} width={24} height={24} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={() => navigation.navigate('AddEventPage')}>
+          <SvgXml xml={plusIcon} width={24} height={24} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
+export default HomePage;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F9FAFB', // Daha estetik bir arka plan
+    padding: 20,
+  },
+  header: {
+    marginTop:50,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#28A745',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  calendar: {
+    borderRadius: 10,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    marginBottom: 20,
+  },
+  iconContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    marginTop: 20,
+    backgroundColor: '#ffffff',
+    paddingVertical: 10,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+  },
+  iconButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#28A745',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+  },
+});
