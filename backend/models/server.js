@@ -10,12 +10,14 @@ const Event = require('./events')
 const Need = require('./needs')
 const Notification = require('./notifications')
 const Goal = require('./goals')
+require('dotenv').config({ path: '../.env' });
+
 
 const app = express();
 app.use(cors()); // React Native ile iletişim için gerekli
 app.use(bodyParser.json()); // JSON verileri için
 
-mongoose.connect('mongodb://127.0.0.1:27017/timeBox', {
+mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 }).then(() => console.log('MongoDB Connected'))
@@ -1155,5 +1157,5 @@ app.get('/api/goals/channel/:channelId:', async (req, res) => {
 });
 
 // Server başlatıyoruz
-const PORT = 3000;
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

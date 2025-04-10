@@ -79,7 +79,7 @@ const SignupPage = () => {
         return;
       }
   
-      const response = await axios.post('http://localhost:3000/api/verify-code', {
+      const response = await axios.post('http://timeboxx.onrender.com/api/verify-code', {
         mail: parsedMail,
         verificationCode,
       });
