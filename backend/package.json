@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node backend/models/server.js"
+    "start": "node models/server.js"
   },
   "keywords": [],
   "author": "",

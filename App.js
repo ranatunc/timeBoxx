@@ -7,7 +7,6 @@ import i18n from './src/Language/i18n';
 import { I18nextProvider } from 'react-i18next';
 import { LanguageProvider } from './src/Language/LanguageContext';
 
-
 const Stack = createStackNavigator();
 
 const changeLanguage = async (lng) => {

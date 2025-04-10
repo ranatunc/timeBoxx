@@ -10,7 +10,7 @@ const Event = require('./events')
 const Need = require('./needs')
 const Notification = require('./notifications')
 const Goal = require('./goals')
-require('dotenv').config({ path: '../.env' });
+require('dotenv').config();
 
 
 const app = express();
