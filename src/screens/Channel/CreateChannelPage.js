@@ -3,42 +3,43 @@ import { StyleSheet, Text, View, TextInput, TouchableOpacity } from 'react-nativ
 import { useNavigation } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTranslation } from 'react-i18next';
+import { API_URL } from '/Users/ranatunc/Desktop/timeBoxx/src/config/config.js'; 
 
 const CreateChannelPage = () => {
   const [channelName, setChannelName] = useState('');
   const [selectedCommunity, setSelectedCommunity] = useState('');
-  const [currentDate, setCurrentDate] = useState(new Date().toISOString()); // Anlık tarih durumu
+  const [currentDate, setCurrentDate] = useState(new Date().toISOString());
   const [userId, setUserId] = useState(null);
   const [username, setUsername] = useState(null);
   const navigation = useNavigation();
+  const { t } = useTranslation();
 
-  // Kullanıcı bilgilerini kontrol et ve state'e kaydet
   useEffect(() => {
     const checkUserInfo = async () => {
       const storedUserId = await AsyncStorage.getItem('userId');
       const storedUsername = await AsyncStorage.getItem('username');
-  
+
       if (!storedUserId || !storedUsername) {
-        alert('Kullanıcı bilgileri eksik! Lütfen tekrar giriş yapın.');
+        alert(t('create_channel.missing_user_info'));
         return;
       }
-  
+
       setUserId(storedUserId);
       setUsername(storedUsername);
     };
-  
+
     checkUserInfo();
   }, []);
-  
 
   const handleCreateChannel = async () => {
     if (!userId || !username) {
-      alert('Kullanıcı bilgileri eksik! Lütfen tekrar giriş yapın.');
+      alert(t('create_channel.missing_user_info'));
       return;
     }
 
     if (channelName.trim() === '' || selectedCommunity === '') {
-      alert('Lütfen tüm alanları doldurun.');
+      alert(t('create_channel.fill_all_fields'));
       return;
     }
 
@@ -52,26 +53,24 @@ const CreateChannelPage = () => {
     };
 
     try {
-      const response = await fetch('http://localhost:3000/api/channelCreate', {
+      const response = await fetch(`${API_URL}/api/channelCreate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newChannel),
       });
 
-      const data = await response.json(); // JSON formatında veriyi al
+      const data = await response.json();
 
       if (response.ok) {
-        alert(`Kanal oluşturuldu: ${data.channel.name}`);
+        alert(t('create_channel.created_successfully', { channelName: data.channel.name }));
         navigation.navigate('MyChannelsPage', { refresh: true });
         setChannelName('');
         setSelectedCommunity('Teknoloji');
       } else {
-        console.error('Kanal oluşturma hatası:', data);
-        alert(`Hata: ${data.message || 'Bilinmeyen hata'}`);
+        alert(`${t('create_channel.error_creating_channel')} ${data.message || t('create_channel.unknown_error')}`);
       }
     } catch (error) {
-      console.error('Sunucu hatası:', error);
-      alert('Sunucu hatası! Lütfen tekrar deneyin.');
+      alert(t('create_channel.server_error'));
     }
   };
 
@@ -79,7 +78,7 @@ const CreateChannelPage = () => {
     <View style={styles.container}>
       <TextInput
         style={styles.input}
-        placeholder="Kanal Adı"
+        placeholder={t('create_channel.channel_name_placeholder')}
         value={channelName}
         onChangeText={setChannelName}
       />
@@ -88,17 +87,23 @@ const CreateChannelPage = () => {
           selectedValue={selectedCommunity}
           onValueChange={(itemValue) => setSelectedCommunity(itemValue)}
         >
-          <Picker.Item label="Topluluk Seçiniz" value="" />
-          <Picker.Item label="Teknoloji" value="Teknoloji" />
-          <Picker.Item label="Eğlence" value="Eğlence" />
-          <Picker.Item label="Oyun" value="Oyun" />
-          <Picker.Item label="Spor" value="Spor" />
-          <Picker.Item label="Müzik" value="Müzik" />
+          <Picker.Item label={t('create_channel.select_community')} value="" />
+          <Picker.Item label={t("create_channel.technology")} value="Teknoloji" />
+          <Picker.Item label={t("create_channel.entertainment")} value="Eğlence" />
+          <Picker.Item label={t("create_channel.games")} value="Oyun" />
+          <Picker.Item label={t("create_channel.spor" )}value="Spor" />
+          <Picker.Item label={t("create_channel.music")} value="Müzik" />
+          <Picker.Item label={t("create_channel.family")} value="Aile" />
+          <Picker.Item label={t("create_channel.friends")} value="Arkadaş" />
+          <Picker.Item label={t("create_channel.business")} value="İş" />
+
         </Picker>
       </View>
-      <Text style={styles.dateText}>Tarih: {new Date(currentDate).toLocaleString()}</Text>
+      <Text style={styles.dateText}>
+        {t('create_channel.date')}: {new Date(currentDate).toLocaleString()}
+      </Text>
       <TouchableOpacity style={styles.createButton} onPress={handleCreateChannel}>
-        <Text style={styles.createButtonText}>Oluştur</Text>
+        <Text style={styles.createButtonText}>{t('create_channel.create')}</Text>
       </TouchableOpacity>
     </View>
   );

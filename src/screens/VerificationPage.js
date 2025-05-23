@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { View, TextInput, TouchableOpacity, Text, Alert } from 'react-native';
 import axios from 'axios';
+import { API_URL } from '/Users/ranatunc/Desktop/timeBoxx/src/config/config.js'; 
+
 
 const VerificationPage = () => {
   const [verificationCode, setVerificationCode] = useState('');
 
   const handleVerification = async () => {
     try {
-      const response = await axios.post('http://localhost:3000/api/verifyCode', { code: verificationCode });
+      const response = await axios.post(`${API_URL}/api/verifyCode`, { code: verificationCode });
       Alert.alert('Success', response.data.message);
     } catch (error) {
       if (error.response) {

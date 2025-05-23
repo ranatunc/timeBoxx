@@ -59,6 +59,9 @@ const goalsSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User', // Etkinlikteki kullanıcılar User modeline referans
   }],
+  username: {
+    type: String,
+  }, 
 });
 
 const Goal = mongoose.model('Goal', goalsSchema);

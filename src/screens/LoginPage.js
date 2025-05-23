@@ -1,95 +1,148 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image, Alert } from 'react-native';
+import React, { useState, useContext, useLayoutEffect } from 'react';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image, Alert, Modal} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_URL } from '/Users/ranatunc/Desktop/timeBoxx/src/config/config.js'; 
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useTranslation } from 'react-i18next';
+import { LanguageContext } from '/Users/ranatunc/Desktop/timeBoxx/src/Language/LanguageContext.js';
+import { TouchableWithoutFeedback } from 'react-native'; 
+import AntDesign from 'react-native-vector-icons/AntDesign';
 
 const LoginPage = ({ setIsLoggedIn }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const navigation = useNavigation();
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const { t, i18n } = useTranslation();
+  const { changeLanguage } = useContext(LanguageContext);
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
+
+
+  const toggleLanguageModal = () => {
+    setLanguageModalVisible(!languageModalVisible);
+  };
+  
+  useLayoutEffect(() => {
+    if (i18n && i18n.language) {
+      navigation.setOptions({
+        headerRight: () => (
+          <TouchableOpacity
+            onPress={toggleLanguageModal}
+            style={styles.languageButton}
+          >
+            <Text style={styles.languageText}>{i18n.language === 'tr' ? '🇹🇷' : '🇬🇧'}</Text>
+            <Text style={styles.languageText}>{i18n.language.toUpperCase()}</Text>
+            <AntDesign name="down" size={20} color="#808080" style={{ marginLeft: 4 }} />
+          </TouchableOpacity>
+        ),
+      });
+    }
+  }, [navigation, i18n.language]);
+  
+
+  const handleLanguageChange = (lang) => {
+    changeLanguage(lang);
+    setLanguageModalVisible(false);
+  };
 
   const handleLogin = async () => {
-    
     if (!username || !password) {
-      Alert.alert('Hata', 'Lütfen tüm alanları doldurun!');
+      Alert.alert(t('login'), t('errorFillFields'));
       return;
     }
+
     try {
-      const response = await fetch('https://timeboxx.onrender.com/api/login', {
+      const response = await fetch(`${API_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
-      
+
       const data = await response.json();
-  
+
+      if (!response.ok) {
+        Alert.alert(t('login'), data.message || t('loginFailed'));
+        return;
+      }
+
       if (data.user) {
-        await AsyncStorage.setItem('user', JSON.stringify(data.user)); // Kullanıcı bilgisini sakla
+        await AsyncStorage.setItem('user', JSON.stringify(data.user));
         await AsyncStorage.setItem('userId', data.user._id);
+        await AsyncStorage.setItem('loggedUserId', data.user._id);
         await AsyncStorage.setItem('username', data.user.username);
         setIsLoggedIn(true);
-        navigation.navigate('Home'); // Profili aç
-      } else {
-        alert('Hatalı giriş!');
+        navigation.navigate('Home');
       }
-    }catch (error) {      
-      if (error.response) {
-        if (error.response.status === 401) {
-          // Geçersiz kullanıcı adı veya şifre hatasını Türkçeleştiriyoruz
-          const errorMessage = error.response.data.message === 'Invalid credentials' 
-            ? 'Geçersiz kullanıcı adı veya şifre!' 
-            : error.response.data.message;
-          
-          Alert.alert('Hata', errorMessage); // Kullanıcıya Türkçe hata mesajını gösteriyoruz
-        } else {
-          const errorMessage = `Bir hata oluştu: ${error.response.statusText}`;
-          Alert.alert('Hata', errorMessage); // Diğer hata mesajlarını da Türkçeleştirebiliriz
-        }
-      } else if (error.request) {
-        console.error('Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.');
-        Alert.alert('Hata', 'Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.');
-      } else {
-        console.error('Bir hata oluştu:', error.message);
-        Alert.alert('Hata', 'Bir hata oluştu. Lütfen tekrar deneyin.');
-      }
+    } catch (error) {
+      Alert.alert(t('login'), t('serverError'));
     }
-    
-    
   };
-  
 
   const goToSignup = () => {
-    navigation.navigate('Signup');  // Signup sayfasına yönlendir
+    navigation.navigate('Signup');
   };
 
   return (
     <View style={styles.container}>
-      <Image style={styles.image} source={require('/Users/ranatunc/timeBoxx/assets/login/logo.jpg')} />
+      <Image style={styles.image} source={require('/Users/ranatunc/Desktop/timeBoxx/assets/login/logo5.png')} />
       <View style={styles.bottomContainer}>
         <TextInput
-          placeholder="Kullanıcı Adı"
+          placeholder={t('username')}
           style={styles.input}
           placeholderTextColor="#C2F7DA"
           value={username}
           onChangeText={setUsername}
         />
-        <TextInput
-          placeholder="Şifre"
-          style={styles.input}
-          placeholderTextColor="#C2F7DA"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
+
+        <View style={styles.passwordContainer}>
+          <TextInput
+            placeholder={t('password')}
+            style={styles.passwordInput}
+            placeholderTextColor="#C2F7DA"
+            secureTextEntry={!passwordVisible}
+            value={password}
+            onChangeText={setPassword}
+          />
+          <TouchableOpacity onPress={() => setPasswordVisible(!passwordVisible)} style={styles.iconButton}>
+            <Icon name={passwordVisible ? 'visibility' : 'visibility-off'} size={24} color="#C2F7DA" />
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-          <Text style={styles.loginButtonText}>Giriş Yap</Text>
+          <Text style={styles.loginButtonText}>{t('login')}</Text>
         </TouchableOpacity>
+
         <TouchableOpacity onPress={goToSignup}>
-          <Text style={styles.noAccountText}>Hesabın yok mu? Kayıt Ol!</Text>
+          <Text style={styles.noAccountText}>{t('dontHaveAccountSignup')}</Text>
         </TouchableOpacity>
       </View>
+      <Modal
+        animationType="fade"
+        transparent
+        visible={languageModalVisible}
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setLanguageModalVisible(false)}>
+          <View style={styles.modalContainer}>
+            <TouchableWithoutFeedback>
+              <View style={styles.languageTooltip}>
+                <TouchableOpacity style={styles.langOption} onPress={() => handleLanguageChange('tr')}>
+                  <Text style={styles.langText}>🇹🇷 Türkçe</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.langOption} onPress={() => handleLanguageChange('en')}>
+                  <Text style={styles.langText}>🇬🇧 English</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
     </View>
   );
+  
 };
 
 export default LoginPage;
@@ -102,8 +155,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E1E1E',
   },
   image: {
-    width: 200,
-    height: 200,
+    width: 150,
+    height: 150,
     borderRadius: 75,
   },
   bottomContainer: {
@@ -139,4 +192,92 @@ const styles = StyleSheet.create({
     color: '#C2F7DA',
     fontSize: 14,
   },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    height: 50,
+    marginBottom: 10,
+    backgroundColor: '#333',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+  },
+  passwordInput: {
+    flex: 1,
+    color: '#fff',
+  },
+  eyeText: {
+    fontSize: 18,
+    color: '#C2F7DA',
+    paddingHorizontal: 10,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 50,
+    paddingRight: 15,
+    backgroundColor: 'transparent',
+    marginTop:30,
+  },
+  languageTooltip: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+  },
+  langOption: {
+    paddingVertical: 6,
+  },
+  langText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  languageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 10, 
+  },
+  languageText: {
+    fontSize: 16,
+    marginRight: 5,
+    color: '#fff',
+  },
+
+  languageHeader: {
+    alignItems: 'flex-end',
+    position: 'absolute',
+    right: 0,
+    padding: 15,
+    backgroundColor: '#f5f5f5',
+    zIndex: 10,
+    marginTop:30,
+  },
+  languageSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  languageDropdown: {
+    marginTop: 5,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+  },
+  
 });

@@ -3,31 +3,31 @@ import { View, Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
+import { API_URL } from '/Users/ranatunc/Desktop/timeBoxx/src/config/config.js'; 
 
 const MyChannelsPage = () => {
   const [channels, setChannels] = useState([]);
   const [isUserMember, setIsUserMember] = useState(false);
   const navigation = useNavigation();
+  const { t } = useTranslation();
 
   const fetchChannels = async () => {
     try {
       const userId = await AsyncStorage.getItem('userId');
       if (!userId) {
-        console.error('Kullanıcı ID bulunamadı!');
         return;
       }
 
-      const response = await fetch(`http://localhost:3000/api/user-channels/${userId}`);
+      const response = await fetch(`${API_URL}/api/user-channels/${userId}`);
       const data = await response.json();
 
       if (response.ok) {
         setChannels(data);
         setIsUserMember(data.length > 0);
       } else {
-        console.error('Kanal listesi alınamadı:', data);
       }
     } catch (error) {
-      console.error('Hata:', error);
     }
   };
 
@@ -45,7 +45,7 @@ const MyChannelsPage = () => {
             <TouchableOpacity
               style={styles.channelItem}
               onPress={() =>
-                navigation.navigate('ChannelDetailPage', { channelId: item._id }) // Kanala tıklandığında detay sayfasına yönlendiriyoruz
+                navigation.navigate('ChannelDetailPage', { channelId: item._id }) 
               }
             >
               <Text style={styles.channelName}>{item.name}</Text>
@@ -54,7 +54,7 @@ const MyChannelsPage = () => {
         />
       ) : (
         <View style={styles.noChannelsContainer}>
-          <Text style={styles.noChannelsText}>Henüz bir kanala üye değilsiniz.</Text>
+            <Text style={styles.noChannelsText}>{t('my_channels.no_membership')}</Text>
         </View>
       )}
       <TouchableOpacity

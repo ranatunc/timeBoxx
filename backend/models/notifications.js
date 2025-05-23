@@ -7,8 +7,11 @@ const notificationSchema = new mongoose.Schema({
     },
     message: {
         type: String,
-        required: true
-    },
+        required: false
+    },  
+    titleKey: { type: String, required: false },
+    messageKey: { type: String, required: false },
+    messageParams: { type: Object, required: false },
     eventId: {
         type: mongoose.Schema.Types.ObjectId, // Etkinliğe referans için ObjectId olmalı
         ref: "Event",
@@ -51,7 +54,7 @@ const notificationSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'User', // Etkinlikteki kullanıcılar User modeline referans
     }],
-});
+},{ timestamps: true });
 
 const Notification = mongoose.model("Notification", notificationSchema);
 module.exports = Notification;

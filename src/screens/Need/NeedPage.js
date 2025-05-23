@@ -1,10 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState ,useContext} from 'react';
 import { StyleSheet,View, TouchableOpacity, FlatList, Text, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CheckBox } from 'react-native-elements';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
+import { AntDesign } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
+import { ChannelContext } from '../../context/ChannelContext';
+import { useTranslation } from 'react-i18next';
+import { API_URL } from '/Users/ranatunc/Desktop/timeBoxx/src/config/config.js'; 
+
 
 const NeedPage = () => {
   const navigation = useNavigation();
@@ -12,9 +20,21 @@ const NeedPage = () => {
   const [needs, setNeeds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [channelId, setChannelId] = useState(route.params?.channelId);
   const [checked, setChecked] = useState(false);
   const [selectedItems, setSelectedItems] = useState({});
+  const [channelUsers, setChannelUsers] = useState([]);
+  const { activeChannelId } = useContext(ChannelContext);
+  const [channelId, setChannelId] = useState(activeChannelId);
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    if (activeChannelId) {
+      setChannelId(activeChannelId);
+      fetchNeeds(activeChannelId);
+    } else {
+      setChannelId(null);
+    }
+  }, [activeChannelId]);
 
   useEffect(() => {
     const getActiveChannel = async () => {
@@ -30,102 +50,191 @@ const NeedPage = () => {
     if (channelId) {
       fetchNeeds(channelId.trim());
     } else {
-      console.log("HATA: channelId alınamadı!");
     }
   }, [channelId]);
 
-  const fetchNeeds = async (id) => {
+  const fetchNeeds = async (channelId) => {
     try {
-      const response = await axios.get(`http://localhost:3000/api/needs/${id}`);
-      console.log(response.data); 
+      const response = await axios.get(`${API_URL}/api/needs/${channelId}`);
       setNeeds(response.data.needs);
       
     } catch (err) {
-      console.error("API Hatası:", err);
-      setError('Bir hata oluştu!');
+      setError(t('need_page.error_occurred'));
     } finally {
       setLoading(false);
     }
   };
 
   const getRandomColor = () => {
-    const colors = ['#FFD700', '#FF69B4', '#8A2BE2', '#20B2AA'];
+    const colors = [
+      '#FF6F61', '#FF8C42', '#F4A261', '#E76F51', '#D62828',
+       '#7FB800', '#6FCF97', '#2E8B57', '#228B22',
+       '#20B2AA',   '#1E90FF',
+      '#6495ED', '#4169E1', '#6A5ACD', '#483D8B', '#191970',
+      '#8A2BE2', '#BA55D3', '#DA70D6', '#9932CC', '#9400D3',
+      '#C71585', '#FF69B4', '#DB7093', '#E9967A', '#FA8072',
+      '#CD853F', '#D2691E', '#A0522D', '#8B4513',
+      '#556B2F', '#6B8E23', '#9ACD32',
+       '#FFA500', '#FFB347', '#E1AD01', '#C49E35'
+    ];
     return colors[Math.floor(Math.random() * colors.length)];
   };
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
-    );
-  }
+  useFocusEffect(
+    useCallback(() => {
+      const refreshNeeds = async () => {
+        if (channelId) {
+          await fetchNeeds(channelId.trim());
+        }
+      };
+  
+      refreshNeeds();
+    }, [channelId])
+  );
 
-  const toggleCheckBox = (id) => {
-    setSelectedItems((prevState) => ({
-      ...prevState,
-      [id]: !prevState[id], // ✅ Seçili durumu değiştir
-    }));
-  };
+  useEffect(() => {
+    const fetchChannelData = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/channel/${channelId}`);
+        setChannelUsers(res.data.users);
+      } catch (err) {
+      }
+    };
+  
+    if (channelId) fetchChannelData();
+  }, [channelId]);
 
   return (
     <View style={styles.container}>
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {channelId ? (
+        <>
+          {error && <Text style={styles.errorText}>{t('error_occurred')}</Text>}
+  
+          {needs.length > 0 ? (
+            <FlatList
+              contentContainerStyle={styles.listContainer}
+              data={needs.reverse()} 
+              keyExtractor={(item, index) => item._id ? item._id.toString() : index.toString()}
+              renderItem={({ item }) => {
+                let completedCount = item.completedUsers?.length || 0;
+                let pendingCount = 0;
+              
+                if (item.singleCompletion) {
+                  if (item.completed) {
+                    completedCount = 1;
+                    pendingCount = 0;
+                  } else {
+                    completedCount = 0;
+                    pendingCount = 1;
+                  }
+                } else {
+                  const totalCount = item.users?.length || 0;
+                  completedCount = item.completedUsers?.length || 0;
+                  pendingCount = totalCount - completedCount;
+                }
+                return (
+                  <TouchableOpacity
+                    style={[
+                      styles.itemContainer,
+                      { backgroundColor: item.completed ? '#eeeeee' : '#fff' }
+                    ]}
+                    onPress={async () => {
+                      let fallbackChannelId = null;
+                      if (!item.channelId) {
+                        fallbackChannelId = await AsyncStorage.getItem('activeChannel');
+                      }
+  
+                      const finalChannelId = item.channelId || fallbackChannelId;
+                      const needId = item._id || item.id;
+  
+                      if (!needId) {
+                        return;
+                      }
+  
+                      navigation.navigate('NeedDetailPage', {
+                        needId,
+                        channelId: finalChannelId,
+                      });
+                    }}
+                    >
+                    
+                      <View style={[styles.colorBar, { backgroundColor: getRandomColor() }]} />
+                      <View style={styles.itemContent}>
+                        <Text style={styles.itemTitle}>{item.title}</Text>
+                        <Text style={styles.itemSubtitle}>{item.note}</Text>
+    
+                        <View style={{ flexDirection: 'row', marginTop: 6 }}>
+                          <View style={[styles.iconBox, { borderColor: '#4CAF50' }]}>
+                            <AntDesign name="checkcircle" size={16} color="#4CAF50" style={{ marginRight: 6 }} />
+                            <Text style={styles.iconBoxText}>{completedCount}</Text>
+                          </View>
+    
+                          <View style={[styles.iconBox, { borderColor: '#FFC107' }]}>
+                            <MaterialIcons name="hourglass-top" size={16} color="#E4B16D" style={{ marginRight: 6 }} />
+                            <Text style={styles.iconBoxText}>{pendingCount}</Text>
+                          </View>
+                        </View>
+    
+                        {item.completed ? (
+                         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5 }} />
+                        ) : null}
 
-      {needs.length > 0 ? (
-        <FlatList
-          contentContainerStyle={styles.listContainer}
-          data={needs}
-          keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
-          renderItem={({ item }) => (
-            <TouchableOpacity 
-              style={[styles.itemContainer, { backgroundColor: '#fff' }]}
-              onPress={() =>
-               navigation.navigate('NeedDetailPage', { needId: item.id })}>
-              <View style={[styles.colorBar, { backgroundColor: getRandomColor() }]} />
-              <View style={styles.itemContent}>
-                <Text style={styles.itemTitle}>{item.title}</Text>
-                <Text style={styles.itemSubtitle}>{item.note}</Text>
-              </View>
-              <CheckBox
-                checked={selectedItems[item.id] || false}
-                onPress={() => toggleCheckBox(item.id)}
-                checkedIcon="check-square"
-                uncheckedIcon="square-o"
-                containerStyle={{ margin: 0, padding: 0 }} // Küçük checkbox için
-              />
-            </TouchableOpacity>
+                      </View>
+                          {item.completed &&  (
+                            <View style={{ position: 'absolute', top: 10, right: 10 }}>
+                              <AntDesign name="checkcircleo" size={24} color="#888" style={{ marginRight: 6 }} />
+                            </View>
+                          )}
+
+                  </TouchableOpacity>
+              
+                );
+              }}
+            />
+          ) : (
+            <View style={styles.noNeedsContainer}>
+              <Text style={styles.noNeedsText}>{t('need_page.no_needs')}</Text>
+            </View>
           )}
-        />
+        </>
       ) : (
-        <View style={styles.noNeedsContainer}>
-          <Text style={styles.noNeedsText}>Henüz ihtiyaç eklenmedi.</Text>
+        <View style={styles.messageContainer}>
+          <Text style={styles.infoText}>{t('need_page.open_channel_first')}</Text>
         </View>
       )}
-
+  
       <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => navigation.navigate('AddNeedPage')}
+        style={[styles.addButton, !channelId && styles.disabledButton]}
+        onPress={() => {
+          if (channelId) {
+            navigation.navigate('AddNeedPage');
+          }
+        }}
+        disabled={!channelId}
       >
         <Ionicons name="add" size={30} color="white" />
       </TouchableOpacity>
     </View>
   );
-};
+}; 
+
+export default NeedPage;
+
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#ECEDF0',
     justifyContent: 'center',
     alignItems: 'center',
   },
   listContainer: {
     width: '100%',
+    marginTop: 20,
   },
   checkboxContainer: {
     flexDirection: 'row',
-    marginBottom: 20,
+    marginBottom: 30,
   },
   checkbox: {
     alignSelf: 'center',
@@ -135,7 +244,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 15,
     marginVertical: 5,
-    width: '400',
+    width: 380,
     borderRadius: 10,
     shadowColor: '#000',
     shadowOpacity: 0.1,
@@ -189,6 +298,62 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     padding: 10,
   },
+  disabledButton: {
+    backgroundColor: '#a5d6a7',
+    opacity: 0.5,
+  },
+  messageContainer: {
+    marginTop: 50,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  infoText: {
+    fontSize: 16,
+    color: '#888',
+    textAlign: 'center',
+  },
+  statusBoxGreen: {
+    borderColor: '#4CAF50',
+    borderWidth: 2,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusBoxYellow: {
+    borderColor: '#FFC107',
+    borderWidth: 2,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusText: {
+    fontWeight: 'bold',
+    fontSize: 13,
+    color: '#000', 
+  },
+  iconBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderRadius: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginRight: 8,
+    backgroundColor: '#fff',
+    fontWeight: 'bold',
+  },
+  iconBoxText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  
 });
-
-export default NeedPage;

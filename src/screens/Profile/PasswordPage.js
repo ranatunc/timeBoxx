@@ -1,5 +1,4 @@
-// PasswordPage.js
-import React, { useState } from 'react';
+import React, { useState, useEffect, } from 'react';
 import {
   View,
   Text,
@@ -12,6 +11,8 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTranslation } from 'react-i18next';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_URL } from '/Users/ranatunc/Desktop/timeBoxx/src/config/config.js'; 
 
 const PasswordPage = () => {
   const { t } = useTranslation();
@@ -28,32 +29,30 @@ const PasswordPage = () => {
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [userId, setUserId] = useState(null);
 
   const checkPasswordStrength = (password) => {
     if (password.length < 6) {
-      setPasswordStrength('Weak');
+      setPasswordStrength(t('password_page.weak'));
     } else if (password.length >= 6 && password.length < 12) {
-      setPasswordStrength('Medium');
+      setPasswordStrength(t('password_page.medium'));
     } else {
-      setPasswordStrength('Strong');
+      setPasswordStrength(t('password_page.strong'));
     }
   };
 
+useEffect(() => {
+  const fetchUserId = async () => {
+    const storedUserId = await AsyncStorage.getItem('userId');
+    setUserId(storedUserId);
+  };
+
+  fetchUserId();
+}, []);
+
+
   const hasUppercase = (password) => /[A-Z]/.test(password);
   const hasPunctuation = (password) => /[!@#$%^&*()_+{}\[\]:;<>,.?~\\/-]/.test(password);
-
-  const simulatePasswordUpdate = async () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setSuccessMessage(t("Şifreniz başarıyla güncellendi."));
-      setErrorMessage('');
-      setIsLoading(false);
-      setTimeout(() => {
-        setIsModalVisible(false);
-        navigation.goBack();
-      }, 2000);
-    }, 1500);
-  };
 
   const toggleVisibility = (field) => {
     if (field === 'old') setOldPasswordVisible(!oldPasswordVisible);
@@ -66,14 +65,14 @@ const PasswordPage = () => {
 
   const handleSubmit = () => {
     if (newPassword !== confirmPassword) {
-      setErrorMessage(t("Şifreler eşleşmiyor!"));
+      setErrorMessage(t("password_page.passwords_do_not_match"));
       setSuccessMessage('');
       openModal();
       return;
     }
 
     if (!hasUppercase(newPassword) || !hasPunctuation(newPassword)) {
-      setErrorMessage(t("Şifre en az bir büyük harf ve noktalama işareti içermelidir!"));
+      setErrorMessage(t("password_page.password_requirements"));
       setSuccessMessage('');
       openModal();
       return;
@@ -83,12 +82,56 @@ const PasswordPage = () => {
     setSuccessMessage('');
     openModal();
   };
+  const simulatePasswordUpdate = async () => {
+    setIsLoading(true);
+  
+    if (!userId) {
+      setErrorMessage(t("password_page.user_id_not_found"));
+      setIsLoading(false);
+      return;
+    }
+  
+    try {
+      const response = await fetch(`${API_URL}/api/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          oldPassword,
+          newPassword,
+        }),
+      });
+  
+      const data = await response.json();
+  
+      if (!response.ok) {
+        setErrorMessage(data.message || t("password_page.password_update_failed"));
+        setSuccessMessage('');
+      } else {
+        setSuccessMessage(t("password_page.password_update_success"));
+        setErrorMessage('');
+        setTimeout(() => {
+          setIsModalVisible(false);
+          navigation.goBack();
+        }, 2000);
+      }
+    } catch (error) {
+      setErrorMessage(t("password_page.unable_to_connect_server"));
+      setSuccessMessage('');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  
 
   return (
     <View style={styles.container}>
       {isLoading && <ActivityIndicator size="large" color="#0000ff" />}
       <View style={styles.form}>
-        <Text style={styles.label}>{t("Eski Şifre")}</Text>
+        <Text style={styles.label}>{t("password_page.old_password")}</Text>
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
@@ -101,7 +144,7 @@ const PasswordPage = () => {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.label}>{t("Yeni Şifre")}</Text>
+        <Text style={styles.label}>{t("password_page.new_password")}</Text>
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
@@ -117,7 +160,7 @@ const PasswordPage = () => {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.label}>{t("Yeni Şifre Tekrar")}</Text>
+        <Text style={styles.label}>{t("password_page.confirm_new_password")}</Text>
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
@@ -136,10 +179,9 @@ const PasswordPage = () => {
           style={[styles.addButton, { backgroundColor: '#044a42' }]}
           onPress={handleSubmit}
         >
-          <Text style={styles.addButtonText}>{t("save")}</Text>
+          <Text style={styles.addButtonText}>{t("password_page.save")}</Text>
         </TouchableOpacity>
 
-        {/* Modal */}
         <Modal visible={isModalVisible} transparent>
           <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
@@ -147,7 +189,7 @@ const PasswordPage = () => {
                 <>
                   <Text style={styles.modalTitle}>{errorMessage}</Text>
                   <TouchableOpacity style={styles.confirmButton} onPress={closeModal}>
-                    <Text style={styles.confirmButtonText}>{t("close")}</Text>
+                    <Text style={styles.confirmButtonText}>{t("password_page.close")}</Text>
                   </TouchableOpacity>
                 </>
               ) : successMessage ? (
@@ -156,13 +198,13 @@ const PasswordPage = () => {
                 </>
               ) : (
                 <>
-                  <Text style={styles.modalTitle}>{t("Yeni şifrenizi onaylıyor musunuz?")}</Text>
+                  <Text style={styles.modalTitle}>{t("password_page.confirm_password_change")}</Text>
                   <View style={styles.buttonContainer}>
                     <TouchableOpacity style={styles.confirmButton} onPress={simulatePasswordUpdate}>
-                      <Text style={styles.confirmButtonText}>{t("confirm")}</Text>
+                      <Text style={styles.confirmButtonText}>{t("password_page.confirm")}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.cancelButton} onPress={closeModal}>
-                      <Text style={styles.confirmButtonText}>{t("close")}</Text>
+                      <Text style={styles.confirmButtonText}>{t("password_page.close")}</Text>
                     </TouchableOpacity>
                   </View>
                 </>
@@ -176,9 +218,19 @@ const PasswordPage = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5', padding: 20 },
-  form: { marginVertical: 20 },
-  label: { fontSize: 14, color: '#555', marginBottom: 5 },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#f5f5f5', 
+    padding: 20 
+  },
+  form: { 
+    marginVertical: 20 
+  },
+  label: {
+    fontSize: 14, 
+    color: '#555', 
+    marginBottom: 5 
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -211,9 +263,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  modalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
-  modalContent: { width: '80%', padding: 20, backgroundColor: '#333', borderRadius: 10, alignItems: 'center' },
-  modalTitle: { fontSize: 18, color: '#fff', marginBottom: 10, textAlign: 'center' },
+  modalContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)' 
+    },
+  modalContent: { 
+    width: '80%', 
+    padding: 20, 
+    backgroundColor: '#333', 
+    borderRadius: 10, 
+    alignItems: 'center'
+   },
+  modalTitle: { 
+    fontSize: 18, 
+    color: '#fff', 
+    marginBottom: 10, 
+    textAlign: 'center' 
+  },
   buttonContainer: {
     marginTop: 15,
     flexDirection: 'row',

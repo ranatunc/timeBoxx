@@ -1,40 +1,49 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext, useLayoutEffect } from 'react';
 import { StyleSheet, Text, View, Modal, TouchableOpacity } from 'react-native';
 import { Calendar } from 'react-native-calendars';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ChannelContext } from '../../context/ChannelContext';
+import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { API_URL } from '/Users/ranatunc/Desktop/timeBoxx/src/config/config.js'; 
 
-// Rastgele renkler için bir dizi
-const colors = ['red', 'blue', 'green', 'orange', 'purple', 'pink', 'yellow'];
 
 const HomePage = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const route = useRoute();
-
+  const [filterType, setFilterType] = useState('all');
   const [username, setUsername] = useState('');
   const [markedDates, setMarkedDates] = useState({});
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isModalVisible, setModalVisible] = useState(false);
-  const [channelId, setChannelId] = useState(route.params?.channelId);
+  const [loading, setLoading] = useState(true);
+  const { activeChannelId } = useContext(ChannelContext);
+  const [channelId, setChannelId] = useState(activeChannelId);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+
+  
+  const colors = [
+    '#FF6F61', '#FF8C42', '#F4A261', '#E76F51', '#D62828',
+    '#7FB800', '#6FCF97', '#2E8B57', '#228B22', '#20B2AA', '#1E90FF',
+    '#6495ED', '#4169E1', '#6A5ACD', '#483D8B', '#191970',
+    '#8A2BE2', '#BA55D3', '#DA70D6', '#9932CC', '#9400D3',
+    '#C71585', '#FF69B4', '#DB7093', '#E9967A', '#FA8072',
+    '#CD853F', '#D2691E', '#A0522D', '#8B4513',
+    '#556B2F', '#6B8E23', '#9ACD32', '#FFA500', '#FFB347', '#E1AD01', '#C49E35'
+  ];
 
   useEffect(() => {
-    const getActiveChannel = async () => {
-      if (!channelId) {
-        const storedChannelId = await AsyncStorage.getItem('activeChannel');
-        if (storedChannelId) {
-          setChannelId(storedChannelId);
-          fetchEventsFromDatabase(storedChannelId);
-        } else {
-          console.error("HATA: Active channel verisi bulunamadı.");
-        }
-      } else {
-        fetchEventsFromDatabase(channelId);
-      }
-    };
-
-    getActiveChannel();
-  }, [channelId]);
+    if (activeChannelId) {
+      setChannelId(activeChannelId);
+      fetchEventsFromDatabase(activeChannelId);
+    } else {
+      setChannelId(null);
+    }
+  }, [activeChannelId]);
 
   useEffect(() => {
     const getUsername = async () => {
@@ -42,98 +51,151 @@ const HomePage = () => {
         const user = await AsyncStorage.getItem('user');
         if (user) {
           const parsedUser = JSON.parse(user);
-          if (parsedUser && parsedUser.username) {
+          if (parsedUser?.username) {
             setUsername(parsedUser.username);
-          } else {
-            console.log("Kullanıcı adı bulunamadı.");
           }
-        } else {
-          console.log("Kullanıcı verisi AsyncStorage'da bulunamadı.");
         }
       } catch (error) {
-        console.error('Kullanıcı adı alınamadı:', error);
       }
     };
-  
+
     getUsername();
-  }, []);  
+  }, []);
+
+  const fetchUnreadCount = async () => {
+    try {
+      const storedUserId = await AsyncStorage.getItem('userId');
+      if (!storedUserId) return;
+
+      const response = await fetch(`${API_URL}/api/notifications/unread-count/${storedUserId}`);
+      const data = await response.json();
+      setUnreadCount(data.unreadCount || 0);
+    } catch (error) {
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchUnreadCount();
+    }, [])
+  );
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => navigation.navigate('EventNotification')}
+          style={{ marginRight: 15 }}
+        >
+          <View>
+            <Ionicons name="notifications-outline" size={28} color="#333" />
+            {unreadCount > 0 && (
+              <View
+                style={{
+                  position: 'absolute',
+                  right: -2,
+                  top: -2,
+                  backgroundColor: 'red',
+                  width: 10,
+                  height: 10,
+                  borderRadius: 5,
+                }}
+              />
+            )}
+          </View>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, unreadCount]);
+
+  useEffect(() => {
+    if (channelId) {
+      fetchEventsFromDatabase(channelId);
+    }
+  }, [filterType]);
 
   const fetchEventsFromDatabase = async (channelId) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/events/${channelId}`);
+      const response = await fetch(`${API_URL}/api/events/${channelId}`);
       const data = await response.json();
-  
+
       if (!data.events || !Array.isArray(data.events)) {
-        console.error("HATA: API 'events' dizisini göndermedi!");
         return;
       }
-  
+
       const formattedEvents = {};
-      data.events.forEach((event) => {
-        const formattedDate = new Date(event.date).toISOString().split('T')[0];
+      const filteredEvents = data.events.filter((event) => {
+        if (filterType === 'completed') return event.completed === true;
+        if (filterType === 'incomplete') return event.completed === false;
+        return true;
+      });
+
+      filteredEvents.forEach((event) => {
+        const localDate = new Date(event.date);
+        const formattedDate = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
-  
-        // Burada kullanıcı adını doğru şekilde alıyoruz
-        const user = event.username ? event.username : "Bilinmeyen Kullanıcı";
-  
+        const user = event.username || t('unknown_user');
+
         formattedEvents[formattedDate] = {
           id: event.id,
           marked: true,
           dotColor: randomColor,
           selected: true,
           selectedColor: randomColor,
-          user: user,  // Kullanıcı adı buraya geliyor
+          user: user,
           time: event.time,
           location: event.location,
           description: event.description,
         };
       });
 
-      // API yanıtını ve veriyi kontrol etmek için log ekledim
-
       setMarkedDates(formattedEvents);
     } catch (error) {
-      console.error("Etkinlikler alınamadı:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDayPress = (day) => {
-
-    const event = markedDates[day.dateString];  // Tıklanan günün etkinliğini al
-  
-    if (event) {
-  
-      if (!event.id) {
-        console.error("HATA: event.id tanımsız! API'den eksik geliyor olabilir.");
-        return;
-      }
-  
-      navigation.navigate('EventDetailPage', { eventId: event.id ,channelId: channelId});  // eventId'yi gönder
+    const event = markedDates[day.dateString];
+    if (event?.id) {
+      navigation.navigate('EventListPage', {
+        eventId: event.id,
+        channelId: channelId,
+        selectedDate: day.dateString,
+      });
     } else {
-      console.error("HATA: Etkinlik bulunamadı!");
     }
   };
-  
+
   return (
     <View style={styles.container}>
-      <Calendar
-        style={styles.calendar}
-        markedDates={markedDates}
-        markingType={'dot'} // Nokta işaretleme türünü belirt
-        onDayPress={handleDayPress}
-      />
+      {channelId ? (
+        <>
+          <Calendar
+            style={styles.calendar}
+            markedDates={markedDates}
+            markingType={'dot'}
+            onDayPress={handleDayPress}
+          />
+        </>
+      ) : (
+        <View style={styles.messageContainer}>
+          <Text style={styles.infoText}>{t('no_channel_selected')}</Text>
+        </View>
+      )}
 
       {isModalVisible && selectedEvent && (
         <Modal visible={isModalVisible} transparent={true} animationType="slide">
           <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
-              <Text style={styles.modalHeader}>Etkinlik Detayları</Text>
-              <Text style={styles.modalText}>Kullanıcı: {selectedEvent.user || "Bilinmeyen"}</Text>
-              <Text style={styles.modalText}>Saat: {selectedEvent.time}</Text>
-              <Text style={styles.modalText}>Yer: {selectedEvent.location}</Text>
-              <Text style={styles.modalText}>Açıklama: {selectedEvent.description}</Text>
+              <Text style={styles.modalHeader}>{t('event_details')}</Text>
+              <Text style={styles.modalText}>{t('user')}: {selectedEvent.user || t('unknown_user')}</Text>
+              <Text style={styles.modalText}>{t('time')}: {selectedEvent.time}</Text>
+              <Text style={styles.modalText}>{t('location')}: {selectedEvent.location}</Text>
+              <Text style={styles.modalText}>{t('description')}: {selectedEvent.description}</Text>
               <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
-                <Text style={styles.closeButtonText}>Kapat</Text>
+                <Text style={styles.closeButtonText}>{t('close')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -141,8 +203,13 @@ const HomePage = () => {
       )}
 
       <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => navigation.navigate('AddEventScreen', { channelId })}
+        style={[styles.addButton, !channelId && styles.disabledButton]}
+        onPress={() => {
+          if (channelId) {
+            navigation.navigate('AddEventScreen', { channelId });
+          }
+        }}
+        disabled={!channelId}
       >
         <Ionicons name="add" size={30} color="white" />
       </TouchableOpacity>
@@ -151,6 +218,7 @@ const HomePage = () => {
 };
 
 export default HomePage;
+
 
 const styles = StyleSheet.create({
   container: {
@@ -168,6 +236,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 5,
     marginTop: -100,
+  },
+  messageContainer: {
+    marginTop: 50,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  infoText: {
+    fontSize: 16,
+    color: '#888',
+    textAlign: 'center',
   },
   modalContainer: {
     flex: 1,
@@ -209,5 +287,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     borderRadius: 30,
     padding: 10,
+  },
+  disabledButton: {
+    backgroundColor: '#a5d6a7',
+    opacity: 0.5,
   },
 });

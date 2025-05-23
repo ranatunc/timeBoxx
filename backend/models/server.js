@@ -1,43 +1,55 @@
+require('dotenv').config({ path: '/Users/ranatunc/Desktop/timeBoxx/backend/.env' });
 const { MongoClient } = require('mongodb');
 const express = require('express');
 const mongoose = require('mongoose');
-const User = require('./users');
+const User = require('./User');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const nodemailer = require("nodemailer");
-const Channel =require('./channels.js')
-const Event = require('./events')
-const Need = require('./needs')
-const Notification = require('./notifications')
-const Goal = require('./goals')
-require('dotenv').config();
-
-
+const nodemailer = require('nodemailer');
+const Channel = require('./channels.js');
+const Event = require('./events');
+const Need = require('./needs');
+const Notification = require('./notifications');
+const Goal = require('./goals');
 const app = express();
+
+
 app.use(cors()); // React Native ile iletişim için gerekli
 app.use(bodyParser.json()); // JSON verileri için
 
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-}).then(() => console.log('MongoDB Connected'))
+mongoose.connect(process.env.MONGO_URI, { 
+  dbName:'timeboxx',
+ })
+  .then(() => console.log("MongoDB connected"))
   .catch(err => console.log(err));
 
+
+// Çevresel değişkenleri kontrol et
+console.log(process.env.PORT); // Portu kontrol et
+console.log('MONGO_URI:', process.env.MONGO_URI); // Burada çevresel değişkeni konsola yazdırıyoruz
+console.log(process.env);  
 // Login endpoint'i
 app.post('/api/login', async (req, res) => {
-  const { username, password  } = req.body;
+  const { username, password } = req.body;
   try {
-    const user = await User.findOne({ username});
-    if (user) {
-      res.status(200).json({ message: 'Login successful', user });
-    } else {
-      res.status(401).json({ message: 'Invalid credentials' });
+    const user = await User.findOne({ username });
+
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
+
+    // Düz metin karşılaştırma (şifreler hash'lenmediyse)
+    if (user.password !== password) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    res.status(200).json({ message: 'Login successful', user });
+
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
-
 });
+
 
 // Register endpoint'i
 app.post('/api/register', async (req, res) => {
@@ -113,6 +125,16 @@ app.post('/api/send-code', async (req, res) => {
     subject: 'Doğrulama Kodu',
     text: `Doğrulama kodunuz: ${verificationCode}`,
   };
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: 'timeBoxxr.a@gmail.com',
+      pass: 'uipf wwir xrlu xzql', 
+    },
+    tls: {
+      rejectUnauthorized: false,  
+    }  });
+
 
   transporter.sendMail(mailOptions, (error, info) => {
     if (error) {
@@ -204,6 +226,28 @@ app.get('/api/username/:id', async (req, res) => {
   }
 });
 
+app.post('/api/change-password', async (req, res) => {
+  const { userId, oldPassword, newPassword } = req.body;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
+    }
+
+    // Eski şifre kontrolü (güvenlik için hash karşılaştırması önerilir)
+    if (user.password !== oldPassword) {
+      return res.status(400).json({ message: 'Eski şifre yanlış' });
+    }
+
+    user.password = newPassword; // Şifre hashlenmiyorsa doğrudan atanıyor
+    await user.save();
+
+    res.status(200).json({ message: 'Şifre başarıyla güncellendi' });
+  } catch (err) {
+    res.status(500).json({ message: 'Sunucu hatası', error: err.message });
+  }
+});
 
 
 
@@ -212,62 +256,75 @@ app.get('/api/username/:id', async (req, res) => {
 //------------------------Channel-----------------
 
 app.post('/api/channelCreate', async (req, res) => {
-  console.log("İstek verileri:", req.body); // Gelen verileri gör
-  
+
   const { name, communityName, channelCode, userId, username } = req.body;
-  
+
   if (!name || !communityName || !channelCode || !userId || !username) {
-      return res.status(400).json({ message: "Tüm alanları doldurun!" });
+    return res.status(400).json({ message: "Tüm alanları doldurun!" });
   }
-  
+
+  // Kanal adı normalize ediliyor (boşluklar temizlenip küçük harfe çevriliyor)
+  const normalize = (str) => str.trim().toLowerCase();
+  const normalizedName = normalize(name);
+
   try {
-      const user = await User.findById(userId);
-      if (!user) {
-          return res.status(404).json({ message: "Kullanıcı bulunamadı!" });
-      }
-  
-      const existingChannel = await Channel.findOne({ name });
-      if (existingChannel) {
-          return res.status(400).json({ message: "Bu kanal adı zaten kayıtlı!" });
-      }
-  
-      const newChannel = new Channel({
-          name,
-          createdAt: new Date(),
-          communityName,
-          channelCode,
-          users: [userId],
-          username,
-      });
-      await newChannel.save();
-  
-      user.channels.push(newChannel._id);
-      await user.save();
-  
-      res.status(201).json({ message: "Kanal başarıyla oluşturuldu!", channel: newChannel });
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Kullanıcı bulunamadı!" });
+    }
+
+    // Normalize adı kontrol et
+    const existingChannel = await Channel.findOne({ normalizedName });
+    if (existingChannel) {
+      return res.status(400).json({ message: "Bu kanal adı zaten kayıtlı!" });
+    }
+
+    const newChannel = new Channel({
+      name,
+      normalizedName,
+      createdAt: new Date(),
+      communityName,
+      channelCode,
+      users: [userId],
+      username,
+    });
+
+    await newChannel.save();
+
+    user.channels.push(newChannel._id);
+    await User.findByIdAndUpdate(userId, {
+      $push: { channels: newChannel._id }
+    });
+
+    res.status(201).json({ message: "Kanal başarıyla oluşturuldu!", channel: newChannel });
   } catch (error) {
-      res.status(500).json({ message: "Sunucu hatası", error: error.message });
+    res.status(500).json({ message: "Sunucu hatası", error: error.message });
   }
 });
+
 
 // Kanala Katılma
 app.post('/api/join-channel', async (req, res) => {
   const { userId, channelId } = req.body;
+  const channel = await Channel.findById(channelId);
 
+  if (!userId || !channel) {
+    return res.status(404).json({ message: 'Kullanıcı veya Kanal bulunamadı!' });
+  }
   if (!userId || !channelId) {
     return res.status(400).json({ message: 'Kullanıcı ID ve Kanal ID gerekli!' });
   }
 
+  if (!channel || !channel.name || !channel.normalizedName) {
+    return res.status(400).json({ message: 'Geçersiz kanal!' });
+  }
+  
   try {
     const user = await User.findById(userId);
     const channel = await Channel.findById(channelId);
 
     if (!user || !channel) {
       return res.status(404).json({ message: 'Kullanıcı veya Kanal bulunamadı!' });
-    }
-
-    if (!user.firstName || !user.lastName || !user.gender) {
-      return res.status(400).json({ message: 'Kullanıcı bilgileri eksik! Lütfen profilinizi tamamlayın.' });
     }
 
     let isNewJoin = false;
@@ -292,9 +349,9 @@ app.post('/api/join-channel', async (req, res) => {
           const channelUser = await User.findById(channelUserId); // Kullanıcı bilgilerini al
           if (channelUser) {
             await new Notification({
-              title: 'Yeni Kanal Üyesi', // Bildirim başlığı
+              messageKey: 'channel_joined',
+              messageParams: {username: user.username , title},
               userId: channelUserId, // Bildirimi alan kullanıcı
-              message: `Kanala ${user.username} katıldı.`, // Bildirim mesajı
               channelId: channel._id,
               createdAt: new Date(),
             }).save();
@@ -401,7 +458,7 @@ app.get('/api/channel/:channelId/users', async (req, res) => {
 //--------ETKİNLİK----------------------- 
 
 app.post('/api/create-event', async (req, res) => {
-  const { username, description, date, time, location, channelId, userId, communityName } = req.body;
+  const { username, description, date, time, location, channelId, userId, communityName,decisionPeriod } = req.body;
 
   if (!username || !description || !date || !channelId || !userId || !location || !time) {
     return res.status(400).json({ message: 'Tüm alanlar gereklidir!' });
@@ -432,6 +489,22 @@ app.post('/api/create-event', async (req, res) => {
 
     const username = user.username;
 
+    // Karar süresi hesapla
+    let decisionDeadline = new Date(); // şimdi
+
+    if (decisionPeriod === 'test-3dk') {
+      decisionDeadline.setMinutes(decisionDeadline.getMinutes() + 3); // 🔧 3 dakika ekle
+    } else if (decisionPeriod === '1g') {
+      decisionDeadline.setDate(decisionDeadline.getDate() + 1);
+    } else if (decisionPeriod === '7g') {
+      decisionDeadline.setDate(decisionDeadline.getDate() + 7);
+    } else if (decisionPeriod === '30g') {
+      decisionDeadline.setDate(decisionDeadline.getDate() + 30);
+    } else {
+      // Default: 1 gün
+      decisionDeadline.setDate(decisionDeadline.getDate() + 1);
+    }
+
     // Etkinlik oluşturuluyor
     const newEvent = new Event({
       description,
@@ -439,9 +512,11 @@ app.post('/api/create-event', async (req, res) => {
       time,
       location,
       channelId,
-      users: [userId],
+      users: [{ userId, status: 'pending' }],
       username,
       communityName,
+      creatorId: req.body.userId,
+      decisionDeadline,
     });
 
     await newEvent.save();
@@ -455,7 +530,11 @@ app.post('/api/create-event', async (req, res) => {
       .filter((channelUserId) => channelUserId.toString() !== userId) // Etkinlik oluşturan hariç
       .map((channelUserId) => ({
         userId: channelUserId,
-        message: `${username} yeni bir etkinlik oluşturdu: ${description}`,
+        messageKey: 'event_created',
+        messageParams: {
+          date,
+          description
+        },
         eventId: newEvent._id,
         createdAt: new Date(),
       }));
@@ -515,26 +594,78 @@ app.post('/api/join-event', async (req, res) => {
   }
 });
 
+// 📅 Belirli bir tarihteki tüm etkinlikleri getir
+app.get('/api/events', async (req, res) => {
+  const { date } = req.query;
+  console.log("📥 Gelen date parametresi:", date);
 
+  // Tarih parametresi kontrolü
+  if (!date) {
+    return res.status(400).json({ message: 'Tarih parametresi gerekli (gg/aa/yyyy)' });
+  }
+
+  // gg/aa/yyyy formatını kontrol et
+  const dateParts = date.split('/');
+  if (dateParts.length !== 3) {
+    return res.status(400).json({ message: 'Geçersiz tarih formatı (gg/aa/yyyy bekleniyor)' });
+  }
+
+  const [day, month, year] = dateParts.map(part => parseInt(part, 10));
+
+  // Tarih doğrulaması
+  if (isNaN(day) || isNaN(month) || isNaN(year)) {
+    return res.status(400).json({ message: 'Geçersiz tarih bileşeni' });
+  }
+
+  // Date objesi oluştur
+  const start = new Date(year, month - 1, day); // Aylar sıfırdan başladığı için month - 1
+  const end = new Date(start);
+  end.setDate(start.getDate() + 1); // Bir gün sonrası için 'end' tarihi ayarla
+
+  // Tarih doğrulama
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    return res.status(400).json({ message: 'Geçersiz tarih formatı (gg/aa/yyyy bekleniyor)' });
+  }
+
+  try {
+    // Etkinlikleri tarih aralığında bul
+    const events = await Event.find({
+      date: {
+        $gte: start,
+        $lt: end,
+      },
+    }).sort({ date: 1 });
+
+    res.status(200).json(events);
+  } catch (err) {
+    console.error('Etkinlikler alınamadı:', err);
+    res.status(500).json({ message: 'Sunucu hatası', error: err.message });
+  }
+});
 
 // Etkinlik Detaylarını Getirme
 app.get('/api/event/:eventId', async (req, res) => {
   const { eventId } = req.params;
 
   try {
-    // Etkinlik detaylarını ve katılımcıları getir
-    const event = await Event.findById(eventId).populate('userId');
+    const event = await Event.findById(eventId)
+    .populate('users.userId', 'username').populate('userId'); // Eğer event'in sahibi veya oluşturucusu gibi bir şeyse
+
     if (!event) {
       return res.status(404).json({ message: 'Etkinlik bulunamadı' });
     }
+
     res.status(200).json(event);
   } catch (err) {
     res.status(500).json({ message: 'Sunucu hatası', error: err.message });
   }
 });
+
+
 app.delete('/api/event/:eventId', async (req, res) => {
   const { eventId } = req.params;
-  const { userId, username } = req.body;
+  const { userId, username } = req.query;
+
   try {
     // Etkinliği sil
     const event = await Event.findByIdAndDelete(eventId);
@@ -542,13 +673,21 @@ app.delete('/api/event/:eventId', async (req, res) => {
       return res.status(404).json({ message: 'Etkinlik bulunamadı' });
     }
     const notifications = event.users
-      .filter((channelUserId) => channelUserId.toString() !== userId) // Etkinlik oluşturan hariç
-      .map((channelUserId) => ({
-        userId: channelUserId,
-        message: `${username} etkinliği sildi: ${event.description}`,
-        eventId: event._id,
-        createdAt: new Date(),
-      }));
+    .filter(u => u.userId.toString() !== userId)
+    .map(u => ({
+      userId: u.userId,
+      messageKey: 'event_deleted',
+      messageParams: {
+        date,
+        description
+      },      
+      eventId: event._id,
+      createdAt: new Date(),
+    }));
+    
+    if (notifications.length > 0) {
+      await Notification.insertMany(notifications);
+    }
 
     res.status(200).json({ message: 'Etkinlik başarıyla silindi' });
   } catch (err) {
@@ -573,16 +712,24 @@ app.get('/api/events/:channelId', async (req, res) => {
     // ObjectId oluştur
     const objectId = new mongoose.Types.ObjectId(channelId);
 
-    // Kanalı bul
-    const channel = await Channel.findById(objectId).populate('events');
-    
+    // Kanalı al ve kullanıcı listesini çek
+    const channel = await Channel.findById(objectId);
     if (!channel) {
-      console.log("HATA: Kanal bulunamadı!");
       return res.status(404).json({ message: 'Kanal bulunamadı' });
     }
 
+    // Kanalın kullanıcı ID listesini al
+    const channelUserIds = channel.users.map(userId => userId.toString());
+
+    // Bu kanala ait ve oluşturanı kanal üyesi olan etkinlikleri çek
+    const events = await Event.find({ 
+      channelId: objectId, 
+      creatorId: { $in: channel.users } 
+    });
+
+
      // Etkinliklerin ID'lerini düzelt
-     const eventsWithId = channel.events.map(event => ({
+     const eventsWithId = events.map(event => ({
       id: event._id.toString(), 
       title: event.title,
       date: event.date,
@@ -599,65 +746,146 @@ app.get('/api/events/:channelId', async (req, res) => {
     return res.status(500).json({ message: 'Sunucu hatası', error: err.message });
   }
 });
-app.post('/api/events/update-status', async (req, res) => {
+app.get('/api/events/channel/:channelId', async (req, res) => {
   try {
-    const { eventId, userId, status, channelId } = req.body;
+    const { channelId } = req.params;
+    const { date } = req.query;
 
-    // **Gelen verileri logla**
-    console.log("🛠 Gelen Veriler:", { eventId, userId, status, channelId });
-
-    // Eksik bilgi kontrolü
-    if (!eventId || !userId || !status || !channelId) {
-      console.error("❌ Eksik bilgi:", { eventId, userId, status, channelId });
-      return res.status(400).json({ message: "Eksik bilgi: eventId, userId, status ve channelId gereklidir." });
-    }
-
-    // **channelId'nin MongoDB ObjectId formatında olup olmadığını kontrol et**
     if (!mongoose.Types.ObjectId.isValid(channelId)) {
-      console.error("❌ Geçersiz kanal ID:", channelId);
-      return res.status(400).json({ message: "Geçersiz kanal ID!" });
+      return res.status(400).json({ message: 'Geçersiz kanal ID!' });
     }
 
-    // Güncellenebilir durumları kontrol et
-    const validStatuses = ['approved', 'rejected', 'pending', 'scheduled'];
+    if (!date) {
+      return res.status(400).json({ message: 'Tarih eksik!' });
+    }
+
+    // Tarihi başlangıç ve bitiş saatine çevir
+    const [day, month, year] = date.split('/');
+    const startOfDay = new Date(`${year}-${month}-${day}T00:00:00`);
+    const endOfDay = new Date(`${year}-${month}-${day}T23:59:59`);
+
+    // Kanalı doğrula
+    const channel = await Channel.findById(channelId);
+    if (!channel) {
+      return res.status(404).json({ message: 'Kanal bulunamadı' });
+    }
+
+    // Etkinlikleri çek
+    const events = await Event.find({
+      channelId,
+      date: { $gte: startOfDay, $lte: endOfDay },
+    }).populate('users.userId'); // Eğer kullanıcı bilgileri lazımsa
+
+    res.status(200).json(events);
+  } catch (error) {
+    console.error("Hata:", error);
+    res.status(500).json({ message: 'Sunucu hatası', error: error.message });
+  }
+});
+app.post('/api/events/update-status', async (req, res) => {
+  console.log("🧪 Event users schema:", Event.schema.paths['users.$.userId']);
+  try {
+    const { eventId, userId, status, channelId, username } = req.body;
+
+    console.log("📥 Status update request:", { eventId, userId, status, channelId });
+
+    if (!eventId || !userId || !status || !channelId) {
+      return res.status(400).json({ message: "Eksik bilgi gönderildi." });
+    }
+
+    const validStatuses = ['approved', 'rejected', 'pending'];
     if (!validStatuses.includes(status)) {
-      console.error("❌ Geçersiz durum değeri:", status);
       return res.status(400).json({ message: "Geçersiz durum değeri." });
     }
 
-    // Etkinliği MongoDB'de ara
+    if (
+      !mongoose.Types.ObjectId.isValid(eventId) ||
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
+      return res.status(400).json({ message: "Geçersiz ID formatı." });
+    }
+
     const event = await Event.findById(eventId);
     if (!event) {
-      console.error("❌ Etkinlik bulunamadı:", eventId);
       return res.status(404).json({ message: "Etkinlik bulunamadı." });
     }
+    const now = new Date();
+    const decisionDeadline = new Date(event.decisionDeadline);
+    const timeExpired = now > decisionDeadline;
+
+    if (timeExpired) {
+      return res.status(403).json({ message: "Karar verme süresi sona erdi." });
+    }
 
 
+     // Kullanıcıyı bul ve güncelle
+    const userObjectId = new mongoose.Types.ObjectId(userId);
 
-    // Kullanıcının etkinlikteki durumunu güncelle
-    await Event.findByIdAndUpdate(eventId, { status }, { new: true });
+    const userIndex = event.users.findIndex(
+      (u) => u.userId && u.userId.toString() === userObjectId.toString()
+    );
+    console.log("📌 typeof userObjectId:", typeof userObjectId);
+    console.log("📌 userObjectId instanceof ObjectId:", userObjectId instanceof mongoose.Types.ObjectId);
+    
+    if (userIndex !== -1) {
+      event.users[userIndex].status = status;
+      console.log(`✅ Kullanıcı statüsü güncellendi: ${status}`);
+    } else {
+      event.users = event.users.filter(u => u.userId && u.status); // 👈 BOZUK KULLANICILARI TEMİZLE
+    
+      const newUser = {
+        userId: new mongoose.Types.ObjectId(userId),
+        status
+      };
+    
+      event.users.push(newUser);
+      console.log(`✅ Yeni kullanıcı eklendi: ${status}`);
+    }
+    
+    
 
-    console.log("✅ Durum başarıyla güncellendi:", { eventId, newStatus: status });
+    await event.save();
 
-    return res.status(200).json({ message: "Durum başarıyla güncellendi.", newStatus: status });
+    await Notification.create({
+      userId: event.userId,
+      title: 'Etkinlik Yanıtı',
+      message: `${username}, etkinliğe "${status}" dedi.`,
+      eventId,
+      createdAt: new Date()
+    });
+
+    return res.status(200).json({ message: "Durum başarıyla güncellendi." });
 
   } catch (error) {
-    console.error("❌ Sunucu hatası:", error);
-    return res.status(500).json({ message: "Sunucu hatası. Lütfen tekrar deneyin." });
+    console.error("❌ Status update server error:", error);
+    return res.status(500).json({ message: "Sunucu hatası." });
   }
 });
-app.get('/api/channels/:channelId', async (req, res) => {
+
+
+
+app.get('/api/channel/:channelId', async (req, res) => {
+  const { channelId } = req.params;
+
+  console.log("📥 channelId alındı:", channelId);
+
+  if (!mongoose.Types.ObjectId.isValid(channelId)) {
+    console.warn("❌ Geçersiz channelId:", channelId);
+    return res.status(400).json({ message: 'Geçersiz kanal ID!' });
+  }
+
   try {
-    const channel = await Channel.findById(req.params.channelId)
-      .populate('users', 'username')  // 'users' alanını popüle ediyoruz ve sadece username'lerini alıyoruz
-      .exec();
+    const channel = await Channel.findById(channelId).populate('users', 'username');
     if (!channel) {
-      return res.status(404).json({ message: 'Channel not found' });
+      console.warn("❌ Kanal bulunamadı:", channelId);
+      return res.status(404).json({ message: 'Kanal bulunamadı!' });
     }
+
+    console.log("✅ Kanal bulundu:", channel.name);
     res.json(channel);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    console.error('❌ Kanal detaylarında hata:', err);
+    res.status(500).json({ message: 'Sunucu hatası', error: err.message });
   }
 });
 
@@ -665,31 +893,20 @@ app.get('/api/channels/:channelId', async (req, res) => {
 app.get('/api/events/:eventId/participants', async (req, res) => {
   try {
     const { eventId } = req.params;
-    console.log('alınan Event Id', eventId)
-    // eventId boş veya geçersizse hata verelim
-    if (!eventId || eventId.length !== 24) {
-      console.log('alınan Event Id', eventId)
-      console.log('event uzunluğu', eventId.length)
 
+    if (!eventId || eventId.length !== 24) {
       return res.status(400).json({ message: "Geçersiz eventId" });
     }
 
-    const event = await Event.findById(eventId);
+    const event = await Event.findById(eventId).populate('users.userId', 'username');
     if (!event) {
       return res.status(404).json({ message: "Etkinlik bulunamadı." });
     }
 
-    const channelId = event.channelId;
-    const channel = await Channel.findById(channelId).populate('users', 'username status');
-    
-    if (!channel) {
-      return res.status(404).json({ message: "Kanal bulunamadı." });
-    }
-
-    const participants = channel.users.map(user => ({
-      _id: user._id.toString(),
-      username: user.username,
-      status: user.status || 'pending',
+    const participants = event.users.map(u => ({
+      _id: u.userId._id,
+      username: u.userId.username,
+      status: u.status || 'pending',
     }));
 
     return res.status(200).json({ participants });
@@ -705,7 +922,11 @@ app.get('/api/events/:eventId/participants', async (req, res) => {
 //-------------Yapılacaklar-----------------
 app.post('/api/create-need', async (req, res) => {
   console.log("Gelen request body:", req.body); 
-  const { userId, username, title, note, channelId, communityName, } = req.body;
+  const { userId, title, note, channelId, communityName, singleCompletion, allMustComplete, users } = req.body;
+  const user = await User.findById(userId);
+  const username = user.username; // Artık bu hata vermez
+  
+  console.log("users:", users); // 🔍 KONTROL NOKTASI
 
   if (!userId || !username || !title || !channelId ) { // type burada kontrol ediliyor
     return res.status(400).json({ message: 'Gerekli alanlar eksik!' });
@@ -735,16 +956,25 @@ app.post('/api/create-need', async (req, res) => {
     }
 
     const username = user.username;
-
     const newNeed = new Need({
       title,
       note,
       channelId,
-      users: [userId],
+      userId, 
+      users: req.body.users, // 👈 BU SATIR!
       username, 
       communityName,
+      singleCompletion,
+      allMustComplete,
+      completedUsers: [],
+      endDate: '',
     });
+    
+    
+    users.forEach(uid => newNeed.completedStatus.set(uid.toString(), false));
 
+ 
+    // İhtiyacı veritabanına kaydediyoruz
     await newNeed.save();
 
     if (!channel.needs) {
@@ -758,9 +988,9 @@ app.post('/api/create-need', async (req, res) => {
     const notifications = channel.users
     .filter((channelUserId) => channelUserId.toString() !== userId) // Kendisi hariç
     .map((channelUserId) => ({
-      title: 'Yeni İhtiyaç Paylaşıldı', // 🔴 title eklendi
       userId: channelUserId,
-      message: `${username} yeni bir ihtiyaç oluşturdu: ${title}`,
+      messageKey:'need_created', 
+      messageParams:{ username, title },
       needId: newNeed._id,
       createdAt: new Date(),
     }));
@@ -815,7 +1045,8 @@ app.get('/api/need/:needId', async (req, res) => {
 
   try {
     // İhtiyacı veritabanından al
-    const need = await Need.findById(needId).populate('userId');
+    const need = await Need.findById(needId).populate('userId').populate('users', 'username').populate('completedUsers', 'username');
+
     if (!need) {
       return res.status(404).json({ message: 'İhtiyaç bulunamadı' });
     }
@@ -826,6 +1057,113 @@ app.get('/api/need/:needId', async (req, res) => {
   }
 });
 
+// Belirli Bir Kanalın Tüm İhtiyaçlarını Getirme
+app.get('/api/needs/:channelId', async (req, res) => {
+  try {
+    const { channelId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(channelId)) {
+      return res.status(400).json({ message: 'Geçersiz kanal ID!' });
+    }
+
+ // GÜNCELLENMİŞ backend kodu
+const channel = await Channel.findById(channelId)
+.populate({
+  path: 'needs',
+  populate: [
+    { path: 'users', select: 'username' },
+    { path: 'completedUsers', select: 'username' }
+  ]
+});
+
+
+    if (!channel) {
+      return res.status(404).json({ message: 'Kanal bulunamadı!' });
+    }
+
+    const needsWithDetails = channel.needs.map(need => ({
+      id: need._id.toString(),
+      title: need.title,
+      note: need.note,
+      username: need.username,
+      users: need.users,               // ✅ artık dolu geliyor
+      completedUsers: need.completedUsers, // ✅ artık dolu geliyor
+      completed: need.completed,
+      singleCompletion: need.singleCompletion,
+    }));
+    
+
+    return res.status(200).json({ needs: needsWithDetails });
+  } catch (err) {
+    console.error("Sunucu Hatası:", err);
+    return res.status(500).json({ message: 'Sunucu hatası', error: err.message });
+  }
+});
+
+
+
+
+
+
+
+// İhtiyacı Tamamlama
+app.put('/api/complete-need/:needId', async (req, res) => {
+  const { needId } = req.params;
+  const { userId } = req.body;
+
+  try {
+    if (!userId) {
+      return res.status(400).json({ message: "Kullanıcı ID gerekli." });
+    }
+
+    const need = await Need.findById(needId);
+    if (!need) {
+      return res.status(404).json({ message: "Need bulunamadı." });
+    }
+
+    // Görev zaten tamamlandıysa tekrar tamamlanamaz
+    if (need.completed) {
+      return res.status(400).json({ message: 'Bu görev zaten tamamlandı.' });
+    }
+
+    // Eğer kullanıcı zaten tamamlamışsa
+    if (need.completedUsers.includes(userId)) {
+      return res.status(400).json({ message: 'Bu görevi tamamladınız.' });
+    }
+
+    // Gerekirse kullanıcıyı katılımcı listesine ekle
+    if (!need.users.includes(userId)) {
+      need.users.push(userId);
+    }
+
+    // Kullanıcıyı tamamlayanlar listesine ekle
+    need.completedUsers.push(userId);
+
+    // Tamamlanma kontrolü
+    if (need.singleCompletion) {
+      need.completed = true;
+      need.status = 'completed';
+    } else if (need.allMustComplete) {
+      const allCompleted = need.completedUsers.length === need.users.length;
+      need.completed = allCompleted;
+      if (allCompleted) {
+        need.status = 'completed';
+      }
+    }
+
+    await need.save();
+
+    res.status(200).json({ message: "Need başarıyla tamamlandı.", need });
+
+  } catch (error) {
+    console.error("Need tamamlanırken hata:", error);
+    res.status(500).json({ message: "Sunucu hatası", error: error.message });
+  }
+});
+
+  
+
+// İhtiyaçları Silme
 app.delete('/api/need/:needId', async (req, res) => {
   const { needId } = req.params;
   const { userId, username } = req.body;
@@ -847,7 +1185,11 @@ app.delete('/api/need/:needId', async (req, res) => {
       .filter((channelUserId) => channelUserId.toString() !== userId) // İhtiyacı oluşturan hariç
       .map((channelUserId) => ({
         userId: channelUserId,
-        message: `${username} ihtiyacı sildi: ${need.description}`, // İhtiyacın açıklaması
+        messageKey: 'need_created',
+        messageParams: {
+          username:need.username,
+          title:need.title
+        },    
         needId: need._id,
         createdAt: new Date(),
       }));
@@ -862,43 +1204,12 @@ app.delete('/api/need/:needId', async (req, res) => {
   }
 });
 
-
-// Belirli Bir Kanalın Tüm İhtiyaçlarını Getirme
-app.get('/api/needs/:channelId', async (req, res) => {
-  try {
-    const { channelId } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(channelId)) {
-      return res.status(400).json({ message: 'Geçersiz kanal ID!' });
-    }
-
-    const channel = await Channel.findById(channelId).populate('needs');
-
-    if (!channel) {
-      return res.status(404).json({ message: 'Kanal bulunamadı!' });
-    }
-
-
-    const needsWithDetails = channel.needs.map(need => ({
-      id: need._id.toString(),
-      title: need.title,
-      note: need.note,
-      username: need.username,
-      users: need.users, 
-    }));
-
-    return res.status(200).json({ needs: needsWithDetails });
-  } catch (err) {
-    console.error("Sunucu Hatası:", err);
-    return res.status(500).json({ message: 'Sunucu hatası', error: err.message });
-  }
-});
 //-----------Bildirimler-------------
 // 📩 Bildirim Oluşturma
 app.post('/api/notifications', async (req, res) => {
-  const { title, message, eventId, userId, channelId } = req.body;
+  const { title, message,titleKey,messageKey,messageParams, eventId, userId, channelId } = req.body;
 
-  if (!title || !message) {
+  if ((!title || !message) && (!titleKey || !messageKey)) {
     return res.status(400).json({ message: 'Başlık ve mesaj zorunludur' });
   }
 
@@ -906,10 +1217,14 @@ app.post('/api/notifications', async (req, res) => {
     const newNotification = new Notification({
       title,
       message,
-      eventId: eventId || null, // Etkinliğe bağlıysa ekleriz, değilse null
-      userId: userId || null, // Kullanıcıya özelse ekleriz, değilse null
-      channelId: channelId || null, // Kanal bazlı bildirimler için
+      titleKey,
+      messageKey,
+      messageParams,
+      eventId: eventId || null,
+      userId: userId || null,
+      channelId: channelId || null,
     });
+    
 
     await newNotification.save();
     res.status(201).json({ message: 'Bildirim başarıyla oluşturuldu', notification: newNotification });
@@ -933,8 +1248,24 @@ app.get('/api/notifications/:userId', async (req, res) => {
   }
 });
 
-// 📌 **Bildirimleri Okundu Olarak İşaretleme**
-app.put('/api/notifications/mark-as-read/:userId', async (req, res) => {
+// ✅ 🔄 TEK BİLDİRİMİ OKUNDU OLARAK İŞARETLEME
+app.put('/api/notifications/mark-as-read/:id', async (req, res) => {
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: 'Geçersiz bildirim ID' });
+  }
+
+  try {
+    await Notification.findByIdAndUpdate(id, { isRead: true });
+    res.status(200).json({ message: 'Bildirim okundu olarak işaretlendi' });
+  } catch (err) {
+    res.status(500).json({ message: 'Sunucu hatası', error: err.message });
+  }
+});
+
+// 📌 TÜM Bildirimleri Okundu Yapmak İstersen (opsiyonel)
+app.put('/api/notifications/mark-as-read-by-user/:userId', async (req, res) => {
   const { userId } = req.params;
 
   if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -942,12 +1273,46 @@ app.put('/api/notifications/mark-as-read/:userId', async (req, res) => {
   }
 
   try {
-    await Notification.updateMany({ userId }, { $set: { read: true } });
+    await Notification.updateMany({ userId }, { $set: { isRead: true } });
     res.status(200).json({ message: 'Tüm bildirimler okundu olarak işaretlendi' });
   } catch (err) {
     res.status(500).json({ message: 'Sunucu hatası', error: err.message });
   }
 });
+// 📛 Bildirim Silme
+app.delete('/api/notifications/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const deletedNotification = await Notification.findByIdAndDelete(id);
+
+    if (!deletedNotification) {
+      return res.status(404).json({ message: 'Bildirim bulunamadı.' });
+    }
+
+    res.status(200).json({ message: 'Bildirim silindi.' });
+  } catch (error) {
+    console.error('Bildirim silme hatası:', error);
+    res.status(500).json({ message: 'Sunucu hatası', error: error.message });
+  }
+});
+// 🔴 Okunmamış bildirim sayısını getir
+app.get('/api/notifications/unread-count/:userId', async (req, res) => {
+  const { userId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return res.status(400).json({ message: 'Geçersiz kullanıcı ID' });
+  }
+
+  try {
+    const unreadCount = await Notification.countDocuments({ userId, isRead: false });
+    res.status(200).json({ unreadCount });
+  } catch (err) {
+    res.status(500).json({ message: 'Sunucu hatası', error: err.message });
+  }
+});
+
+
 
 
 //-----HEDEFLER--------------------------------------
@@ -993,7 +1358,7 @@ app.post('/api/goals', async (req, res) => {
       return res.status(400).json({ message: 'Kullanıcı bu  kanalın üyesi değil' });
     }
 
-    const username = user.username;
+    const creatorUsername = user.username;
 
     const goalData = req.body;
     console.log('Received Goal Data:', goalData); // Burada gelen veriyi kontrol et
@@ -1009,7 +1374,7 @@ app.post('/api/goals', async (req, res) => {
       date , 
       progress: 0,
       communityName,
-      username
+      username : creatorUsername
       });
 
       const validationError = goal.validateSync(); // Mongoose validation
@@ -1026,7 +1391,8 @@ app.post('/api/goals', async (req, res) => {
       .filter((channelUserId) => channelUserId.toString() !== userId) // İhtiyacı oluşturan hariç
       .map((channelUserId) => ({
       userId: channelUserId,
-      message: `${username} yeni bir hedef oluşturdu: ${title}`,
+      messageKey:'goal_created', 
+      messageParams:{ username, title },
       goalId: goal._id,
       createdAt: new Date(),
       date,
@@ -1080,20 +1446,27 @@ app.delete('/api/goals/:goalId', async (req, res) => {
   try {
     const deletedGoal = await Goal.findByIdAndDelete(goalId);
 
+    if (!mongoose.Types.ObjectId.isValid(goalId)) {
+      return res.status(400).json({ message: 'Geçersiz ID formatı' });
+    }
+
     if (!deletedGoal) {
       return res.status(404).json({ message: 'Hedef bulunamadı' });
     }
 
-    const usersToNotify = await getOtherUsers(userId);
-
-    const notifications = usersToNotify.map((uid) => ({
-      userId: uid,
-      message: `${username} bir hedefi sildi: ${deletedGoal.title}`,
+    const notifications = deletedGoal.users
+      .filter((channelUserId) => channelUserId.toString() !== userId) // İhtiyacı oluşturan hariç
+      .map((channelUserId) => ({
+      userId: channelUserId,
+      messageKey: 'goal_deleted',
+      messageParams: {
+        username,
+        title:deletedGoal.title
+      },  
       goalId: deletedGoal._id,
       createdAt: new Date(),
     }));
 
-    await Notification.insertMany(notifications);
     res.status(200).json({ message: 'Hedef başarıyla silindi' });
   } catch (err) {
     res.status(500).json({ message: 'Sunucu hatası', error: err.message });
@@ -1110,10 +1483,11 @@ app.get('/api/goals/:goalId', async (req, res) => {
 
   try {
     // İhtiyacı veritabanından al
-    const goal = await Goal.findById(goalId).populate('userId');
+    const goal = await Goal.findById(goalId);
     if (!goal) {
       return res.status(404).json({ message: 'İhtiyaç bulunamadı' });
     }
+
     res.status(200).json(goal); // İhtiyacın detaylarını döndür
   } catch (err) {
     console.error("Sunucu Hatası:", err); // Detaylı hata logu
@@ -1124,7 +1498,7 @@ app.get('/api/goals/:goalId', async (req, res) => {
 
 
 // Belirli Bir Kanalın Tüm Hedeflerini Getirme
-app.get('/api/goals/channel/:channelId:', async (req, res) => {
+app.get('/api/goals/channel/:channelId', async (req, res) => {
   try {
     const { channelId } = req.params;
 
@@ -1144,6 +1518,7 @@ app.get('/api/goals/channel/:channelId:', async (req, res) => {
       title: goal.title,
       description: goal.description,
       amount: goal.amount,
+      SavedAmount: goal.SavedAmount,
       selectedType: goal.selectedType,
       username: goal.username,
       users: goal.users, 
@@ -1155,6 +1530,40 @@ app.get('/api/goals/channel/:channelId:', async (req, res) => {
     return res.status(500).json({ message: 'Sunucu hatası', error: err.message });
   }
 });
+app.post('/api/goals/:goalId/contributions', async (req, res) => {
+  const { goalId } = req.params;
+  const { username, amount } = req.body;
+
+  console.log("Katkı isteği geldi:", { username, amount });
+
+  if (!username || amount === undefined || amount === null || isNaN(parseFloat(amount))) {
+    return res.status(400).json({ message: 'Geçerli kullanıcı adı ve katkı miktarı gerekli!' });
+  }
+
+  try {
+    const goal = await Goal.findById(goalId);
+    if (!goal) {
+      return res.status(404).json({ message: 'Hedef bulunamadı!' });
+    }
+
+    const contribution = {
+      username,
+      amount: parseFloat(amount),
+      date: new Date().toISOString(),
+    };
+
+    goal.contributions.push(contribution);
+    goal.SavedAmount += parseFloat(amount);
+
+    await goal.save();
+    res.status(200).json(goal);
+  } catch (error) {
+    console.error("Katkı ekleme hatası:", error);
+    res.status(500).json({ message: 'Sunucu hatası', error: error.message });
+  }
+});
+
+
 
 // Server başlatıyoruz
 const PORT = process.env.PORT || 3000;

@@ -19,9 +19,10 @@ const channelSchema = new mongoose.Schema({
         required: true,
         unique: true,
     },
-    users: [{ 
+    users: [
+        { 
         type: mongoose.Schema.Types.ObjectId, 
-        ref: 'users' // Eğer User modeli "users" koleksiyonuna bağlıysa, burada da "users" olmalı
+        ref: 'User'
     }],
     events: [{
         type: mongoose.Schema.Types.ObjectId,
@@ -39,6 +40,12 @@ const channelSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Goal', 
     }],
+    normalizedName: {
+        type: String,
+        required: true,
+        unique: true,
+    },
+      
 });
 
 const Channel = mongoose.model('channels', channelSchema);

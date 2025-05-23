@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const User = require('./users');  // Kullanıcı modelini doğru import et
+const User = require('./User');  // Kullanıcı modelini doğru import et
 
 const needSchema = new mongoose.Schema({
   title: {
@@ -37,6 +37,35 @@ const needSchema = new mongoose.Schema({
     enum: ['scheduled', 'ongoing', 'completed'],
     default: 'scheduled',
   },
+  completedStatus: { // Her kullanıcı için tamamlanma durumu
+    type: Map,
+    of: Boolean, // true ya da false
+    default: {}
+  },
+  singleCompletion: {
+    type: Boolean,
+    default: false,
+  },
+  allMustComplete: {
+    type: Boolean,
+    default: false,
+  },
+  completed: {
+    type: Boolean,
+    default: false,
+  },
+  completedUsers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
+  endDate: {
+    type: Date,
+    required: false, // İsteğe bağlı olabilir
+  }
+  
+  
+ 
+  
     
 });
 

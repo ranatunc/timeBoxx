@@ -1,213 +1,186 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert,Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useTranslation } from 'react-i18next';
+import { API_URL } from '/Users/ranatunc/Desktop/timeBoxx/src/config/config.js'; 
+
 
 const CreateGoalsPage = () => {
   const navigation = useNavigation();
-  const [username, setUsername] = useState(''); // Username state değişkeni
+  const { t } = useTranslation();
+
+  const [username, setUsername] = useState('');
   const [userId, setUserId] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date());
-  const [time, setTime] = useState(new Date());
   const [description, setDescription] = useState('');
   const [title, setTitle] = useState('');
-  const [selectedType, setSelectedType] = useState('Finans'); // Default tür "Finans"
+  const [selectedType, setSelectedType] = useState(t('create_goals_page.default_type')); 
   const [channelId, setChannelId] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(Platform.OS === 'ios');
 
   useEffect(() => {
     const getActiveChannel = async () => {
       try {
         const storedChannelId = await AsyncStorage.getItem('activeChannel');
-        console.log("Stored Channel ID:", storedChannelId); // Debug için
         if (storedChannelId) {
           setChannelId(storedChannelId);
         } else {
-          console.log('HATA: Aktif kanal bulunamadı!');
         }
       } catch (error) {
-        console.error("AsyncStorage'dan kanal alınırken hata oluştu:", error);
       }
     };
-    
     getActiveChannel();
   }, []);
 
   useEffect(() => {
     const getUserData = async () => {
-
       try {
         const user = await AsyncStorage.getItem('user');
-        console.log("Stored User Data:", user); 
         if (user) {
           const parsedUser = JSON.parse(user);
           if (parsedUser && parsedUser._id && parsedUser.username) {
-            setUserId(parsedUser._id); 
-            setUsername(parsedUser.username); 
+            setUserId(parsedUser._id);
+            setUsername(parsedUser.username);
           } else {
-            console.log("Kullanıcı ID veya adı bulunamadı.");
           }
         } else {
-          console.log("Kullanıcı verisi AsyncStorage'da bulunamadı.");
         }
       } catch (error) {
-        console.error('Kullanıcı bilgileri alınamadı:', error);
       }
     };
     getUserData();
   }, []);
 
-  const handleDateChange = (goal, newDate) => {
+  const handleDateChange = (event, selectedDate) => {
     if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-      if (goal.type === 'set' && newDate) {
-        const formattedDate = new Date(newDate).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit',year: 'numeric', }).replace(/\./g, '-'); // YYYY-MM-DD formatı
-        setDate(formattedDate);      }
-    } else {
-      setDate(newDate || date);
+      setShowDatePicker(false); // Android'de seçim veya iptal sonrası picker kapanır
+    }
+  
+    if (selectedDate) {
+      setDate(selectedDate);
     }
   };
+  
+
   const formatDateTime = (date) => {
     const d = new Date(date);
-    const day = String(d.getDate()).padStart(2, '0');  // Gün, örneğin: '05'
-    const month = String(d.getMonth() + 1).padStart(2, '0');  // Ay, örneğin: '03'
-    const year = d.getFullYear();  // Yıl, örneğin: '2025'
-  
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+
     return `${day}/${month}/${year} `;
   };
+
   const handleSave = async () => {
-    // 'user' verisini AsyncStorage'dan al
-    const userData = await AsyncStorage.getItem('user');
-    const parsedUser = JSON.parse(userData);
-  
-    // Kullanıcı verisi yoksa uyarı göster
-    if (!parsedUser || !parsedUser._id) {
-      Alert.alert('Hata', 'Kullanıcı bilgileri alınamadı!');
-      return;
-    }
-  
-    const userId = parsedUser._id;  // userId'yi burada alıyoruz
-    console.log("User ID:", userId);  // Burada userId'yi logluyoruz
-  
     if (!title.trim()) {
-      Alert.alert('Hata', 'Başlık girilmesi zorunludur!');
+      Alert.alert(t('create_goals_page.error_title_required'));
       return;
     }
     if (!channelId) {
-      Alert.alert('Hata', 'Aktif kanal bilgisi alınamadı!');
+      Alert.alert(t('create_goals_page.error_no_active_channel'));
       return;
     }
-  
     if (!title || !amount || !username || !date || !selectedType || !description) {
-      Alert.alert('Hata', 'Lütfen tüm alanları doldurun.');
+      Alert.alert(t('create_goals_page.error_fill_all_fields'));
       return;
     }
-  
+
     const newGoal = {
       title,
-      selectedType: selectedType,
+      selectedType,
       amount,
-      date: date,
+      date,
       description,
       username,
       progress: 0,
       channelId: channelId.trim(),
-      userId: userId,  // Burada userId'yi kullanıyoruz
+      userId,
     };
-  
-    console.log("New Goal Data:", newGoal);  // Burada yeni hedef verisini logluyoruz
-  
+
     try {
-      const response = await fetch('http://localhost:3000/api/goals', {
+      const response = await fetch(`${API_URL}/api/goals`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newGoal),
       });
-  
+
       if (response.ok) {
         const goal = await response.json();
-        Alert.alert('Başarılı', 'Hedef başarıyla kaydedildi!');
-        navigation.navigate('GoalsPage');
-  
+        Alert.alert(t('create_goals_page.success_title'), t('create_goals_page.success_message'));
+        navigation.reset({ index: 0, routes: [{ name: 'GoalsPage' }] });
+
         const formattedDateTime = formatDateTime(date);
-        // Bildirim oluşturma
         const notificationData = {
-          title: 'Hedeflere Yenisi eklendi !!📣',
-          message: `📅 ${formattedDateTime} tarihinde , ${username} yeni bir hedef oluşturdu: ${title}`,
+          titleKey: 'create_goals_page.notification_title', 
+          messageKey: 'new_event_add_message', 
+          messageParams: {
+            time: formattedDateTime,
+            name: title,
+          },
           goalId: goal._id,
           createdAt: new Date(),
           date,
           userId,
-          channelId: channelId,
+          channelId,
         };
-  
-        const notificationResponse = await fetch('http://localhost:3000/api/notifications', {
+
+        const notificationResponse = await fetch(`${API_URL}/api/notifications`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(notificationData),
         });
-  
+
         const notificationResponseData = await notificationResponse.json();
-  
-        if (!notificationResponse.ok) {
-          throw new Error(notificationResponseData.message || 'Bildirim oluşturulamadı');
-        }
-  
-        console.log('Bildirim başarıyla oluşturuldu:', notificationResponseData);
+        if (!notificationResponse.ok) throw new Error(notificationResponseData.message || t('create_goals_page.error_notification_failed'));
       } else {
         const errorData = await response.json();
-        console.error('Sunucu hatası:', errorData);
-        Alert.alert('Hata', errorData.message || 'Sunucu hatası oluştu.');
+        Alert.alert(t('create_goals_page.error_server'), errorData.message || t('create_goals_page.error_server'));
       }
     } catch (error) {
-      console.error('İstek hatası:', error);
-      Alert.alert('Hata', 'Hedef kaydedilemedi.');
+      Alert.alert(t('create_goals_page.error_save_failed'));
     }
   };
-  
-
 
   return (
     <View style={styles.container}>
-      <View style={styles.inputContainer} marginTop='30'>
+      <View style={styles.inputContainer} marginTop="30">
         <Icon name="person" size={30} color="#000" />
-        <Text style={styles.labeluser}><Text style={styles.user}>   {username}</Text> </Text>
+        <Text style={styles.labeluser}>
+          <Text style={styles.user}>   {username}</Text>
+        </Text>
       </View>
 
-      {/* Başlık */}
       <View style={styles.inputContainer}>
         <Icon name="clipboard" size={30} color="#000" />
         <TextInput
           style={styles.input}
-          placeholder="Başlık"
+          placeholder={t('create_goals_page.placeholder_title')}
           value={title}
           placeholderTextColor="#808080"
           onChangeText={setTitle}
         />
       </View>
 
-      {/* Tür Seçimi */}
       <View style={styles.inputContainer}>
         <Icon name="stats-chart" size={30} color="#000" />
         <TextInput
           style={[styles.input, { backgroundColor: '#dcdcdc' }]}
           value={selectedType}
           editable={false}
-          placeholder="Tür Seçin"
+          placeholder={t('create_goals_page.placeholder_type')}
           placeholderTextColor="#808080"
         />
       </View>
 
-      {/* Miktar */}
       <View style={styles.inputContainer}>
         <Icon name="cash" size={30} color="#000" />
         <TextInput
           style={styles.input}
-          placeholder="Miktar"
+          placeholder={t('create_goals_page.placeholder_amount')}
           value={amount}
           placeholderTextColor="#808080"
           onChangeText={(text) => setAmount(text.replace(/[^0-9]/g, ''))}
@@ -215,51 +188,60 @@ const CreateGoalsPage = () => {
         />
       </View>
 
-      {/* Tarih Seçici */}
       <View style={styles.labelContainer}>
-        <Icon name="calendar" size={30} color="#000" />
-        <View style={styles.dateContainer}>
-          <DateTimePicker
-            value={date || new Date()}
-            mode="date"
-            display="default"
-            onChange={handleDateChange}
-          />
-        </View>
-      </View>
+  <Icon name="calendar" size={30} color="#000" />
+  <View style={styles.dateContainer}>
+    <TouchableOpacity onPress={() => setShowDatePicker(true)} style={{ padding: 10 }}>
+      <Text>{formatDateTime(date)}</Text>
+    </TouchableOpacity>
 
-      {/* Açıklama */}
+    {showDatePicker && (
+      <DateTimePicker
+        value={date}
+        mode="date"
+        display="default"  // Modal olarak açar
+        onChange={(event, selectedDate) => {
+          setShowDatePicker(false); // Modalı kapat
+
+          if (selectedDate) {
+            // Eğer kullanıcı bir tarih seçtiyse güncelle
+            setDate(selectedDate);
+          }
+        }}
+      />
+    )}
+  </View>
+</View>
+
+
       <View style={styles.inputContainer}>
-        <Icon name="document-text"size={30} color="#000" />
+        <Icon name="document-text" size={30} color="#000" />
         <TextInput
           style={styles.input}
-          placeholder="Açıklama"
+          placeholder={t('create_goals_page.placeholder_description')}
           value={description}
           placeholderTextColor="#808080"
           onChangeText={setDescription}
         />
       </View>
 
-      {/* Kaydet Butonu */}
-      <TouchableOpacity
-        style={styles.kaydetButton}
-        onPress={handleSave}>
-        <Text style={styles.kaydetButtonText}>Kaydet</Text>
+      <TouchableOpacity style={styles.kaydetButton} onPress={handleSave}>
+        <Text style={styles.kaydetButtonText}>{t('create_goals_page.save_button')}</Text>
       </TouchableOpacity>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { 
+    flex: 1, 
     padding: 20,
-    backgroundColor: '#f5f5f5',
-  },
-  inputContainer: {
-    marginBottom: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
+    backgroundColor: '#f5f5f5' 
+    },
+  inputContainer: { 
+    marginBottom: 15, 
+    flexDirection: 'row', 
+    alignItems: 'center' 
   },
   input: {
     width: 340,
@@ -271,26 +253,26 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#044a42',
   },
-  labelContainer: {
-    marginBottom: 15,
+  labelContainer: { 
+    marginBottom: 15, 
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'center' 
   },
-  dateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  dateContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center' 
   },
-  kaydetButton: {
-    backgroundColor: '#4CAF50',
-    marginTop: 20,
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
+  kaydetButton: { 
+    backgroundColor: '#4CAF50', 
+    marginTop: 20, 
+    padding: 15, 
+    borderRadius: 10, 
+    alignItems: 'center' 
   },
-  kaydetButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+  kaydetButtonText: { 
+    color: '#fff', 
+    fontSize: 16, 
+    fontWeight: 'bold' 
   },
 });
 

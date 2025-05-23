@@ -6,6 +6,7 @@ import NavigationStack from './src/navigation/NavigationStack';
 import i18n from './src/Language/i18n';
 import { I18nextProvider } from 'react-i18next';
 import { LanguageProvider } from './src/Language/LanguageContext';
+import { ChannelProvider } from './src/context/ChannelContext';
 
 const Stack = createStackNavigator();
 
@@ -16,13 +17,14 @@ const changeLanguage = async (lng) => {
 
 
 const App = () => {
-
   return (
-    <LanguageProvider>
-      <I18nextProvider i18n={i18n}>
-          <NavigationStack changeLanguage={changeLanguage}/>
-      </I18nextProvider>
-    </LanguageProvider>
+    <ChannelProvider>
+      <LanguageProvider>
+        <I18nextProvider i18n={i18n}>
+          <NavigationStack changeLanguage={changeLanguage} />
+        </I18nextProvider>
+      </LanguageProvider>
+    </ChannelProvider>
   );
 };
 

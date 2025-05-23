@@ -13,6 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { API_URL } from '/Users/ranatunc/Desktop/timeBoxx/src/config/config.js'; 
 
 const AddEventScreen = () => {
   const { t } = useTranslation();
@@ -23,16 +24,14 @@ const AddEventScreen = () => {
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
   const [markedDates, setMarkedDates] = useState({});
-
-
+  const [decisionPeriod, setDecisionPeriod] = useState('1g');
+  const [infoVisible, setInfoVisible] = useState(false);
   const navigation = useNavigation(); 
-
-  // Picker için state
-  const [showDatePicker, setShowDatePicker] = useState(false);
+ const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date());
 
-  
+
+
   const generateRandomColor = () => {
     const letters = '0123456789ABCDEF';
     let color = '#';
@@ -42,68 +41,77 @@ const AddEventScreen = () => {
     return color;
   };
   
-  const handleDateChange = (event, newDate) => {
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-      if (event.type === 'set' && newDate) {
-        const formattedDate = new Date(newDate).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit',year: 'numeric', }).replace(/\./g, '-'); // YYYY-MM-DD formatı
-        setDate(formattedDate);      }
-    } else {
-      setDate(newDate || date);
-    }
+  const handleDateChange = (event, selectedDate) => {
+    setShowDatePicker(false);
+    if (selectedDate) setDate(selectedDate);
   };
-
-  const handleTimeChange = (event, newTime) => {
-    if (newTime) {
-      setTime(newTime);
-      const formattedTime = newTime.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }); // HH:MM
-    }
+  
+  const handleTimeChange = (event, selectedTime) => {
+    setShowTimePicker(false);
+    if (selectedTime) setTime(selectedTime);
   };
+  
   const formatDateTime = (date) => {
     const d = new Date(date);
-    const day = String(d.getDate()).padStart(2, '0');  // Gün, örneğin: '05'
-    const month = String(d.getMonth() + 1).padStart(2, '0');  // Ay, örneğin: '03'
-    const year = d.getFullYear();  // Yıl, örneğin: '2025'
+    const day = String(d.getDate()).padStart(2, '0'); 
+    const month = String(d.getMonth() + 1).padStart(2, '0');  
+    const year = d.getFullYear(); 
   
-    const hours = String(d.getHours()).padStart(2, '0');  // Saat, örneğin: '00'
-    const minutes = String(d.getMinutes()).padStart(2, '0');  // Dakika, örneğin: '00'
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');  
   
     return `${day}/${month}/${year} ${hours}:${minutes}`;
   };
-  
+
+  const formatDate = (d) => {
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  const formatTime = (d) => {
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
 
   const handleAddEvent = async () => {
     const userId = await AsyncStorage.getItem('userId');
   
-    // Girdi kontrolleri
     if (!username || !date || !time || !location || !description) {
-      alert('Lütfen tüm alanları doldurun!');
+      alert(t('fill_all_fields'));
       return;
     }
-  
-    // Kanal ID'sini AsyncStorage'den al
+
     const activeChannel = await AsyncStorage.getItem('activeChannel');
     if (!activeChannel) {
-      alert('Aktif kanal bulunamadı!');
+      alert(t('active_channel_not_found'));
       return;
     }
-  
-    // Etkinlik verisini oluştur
+    const combinedDateTime = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      time.getHours(),
+      time.getMinutes()
+    );
+
     const eventData = {
       name: description,
       description,
-      date: date, 
+      date: combinedDateTime, 
       time,
       location,
       color: generateRandomColor(), 
       channelId: activeChannel,  
       userId: userId,  
-      username
+      username,
+      decisionPeriod 
     };
   
     try {
-      // Etkinliği oluştur
-      const response = await fetch('http://localhost:3000/api/create-event', {
+      const response = await fetch(`${API_URL}/api/create-event`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(eventData),
@@ -112,21 +120,24 @@ const AddEventScreen = () => {
       const eventResponseData = await response.json();
   
       if (!response.ok) {
-        throw new Error(eventResponseData.message || 'Etkinlik oluşturulamadı');
+        throw new Error(eventResponseData.message || (t('event_creation_failed')));
       }
 
       const formattedDateTime = formatDateTime(date);
       
-      // ✅ **Etkinlik başarıyla oluşturuldu, şimdi bildirim ekleyelim**
       const notificationData = {
-        title: 'Yeni Etkinlik!📣',
-        message: `📅 ${formattedDateTime} tarihinde ${description} etkinliği oluşturuldu.`,
-        eventId: eventResponseData._id, // Etkinlik ID'sini bildirime ekliyoruz
-        userId, // Bildirimi etkinliği oluşturan kişiye bağlıyoruz
-        channelId: activeChannel, // Kanal bazlı bildirim
-      };
+        titleKey: 'new_event_add_title', 
+        messageKey: 'new_event_add_message', 
+        messageParams: {
+          time: formattedDateTime,
+          name: description,
+        },
+        eventId: eventResponseData._id,
+        userId,
+        channelId: activeChannel,
+      };      
   
-      const notificationResponse = await fetch('http://localhost:3000/api/notifications', {
+      const notificationResponse = await fetch(`${API_URL}/api/notifications`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(notificationData),
@@ -135,12 +146,9 @@ const AddEventScreen = () => {
       const notificationResponseData = await notificationResponse.json();
   
       if (!notificationResponse.ok) {
-        throw new Error(notificationResponseData.message || 'Bildirim oluşturulamadı');
+        throw new Error(notificationResponseData.message || (t('failed_to_create_notification')));
       }
   
-      console.log('Bildirim başarıyla oluşturuldu:', notificationResponseData);
-  
-      // 📌 **Tarih işaretleme (HomePage için)**
       const updatedMarkedDates = {
         ...markedDates,
         [date]: {
@@ -151,8 +159,9 @@ const AddEventScreen = () => {
       };
       setMarkedDates(updatedMarkedDates);
   
-      // 📌 **Sayfayı güncelle**
-      navigation.navigate('HomePage', {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'HomePage' }],
         markedDates: updatedMarkedDates,
       });
   
@@ -161,8 +170,6 @@ const AddEventScreen = () => {
       alert(error.message);
     }
   };
-
-  
 
   useEffect(() => {
     const getUsername = async () => {
@@ -173,7 +180,7 @@ const AddEventScreen = () => {
           setUsername(parsedUser.username);
         }
       } catch (error) {
-        console.error('Kullanıcı adı alınamadı:', error);
+        console.error((t('unable_to_fetch_username')), error);
       }
     };
 
@@ -182,83 +189,154 @@ const AddEventScreen = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.inputContainer } marginTop='30'>
+      <View style={styles.inputContainer} marginTop='30'>
         <Icon name="person" size={30} color="#000" />
         <Text style={styles.labeluser}><Text style={styles.user}>   {username}</Text> </Text>
       </View>
 
       <View style={styles.labelContainer}>
-        <Icon name="calendar" size={30} color="#000" />
-        <View style={styles.dateContainer}>
-          <DateTimePicker value={date || new Date()} mode="date" display="default" onChange={handleDateChange} />
-          <Text style={[styles.date, { marginRight: 10, fontSize: 24, fontWeight: 'bold' }]}>      :   </Text>
-          <DateTimePicker value={time || new Date()} mode="time" display="default" onChange={handleTimeChange} />
+      <Icon name="calendar" size={30} color="#000" />
+
+      <View style={styles.dateContainer}>
+  <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.dateBox}>
+  <Text style={styles.dateText}>
+  {`${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`}
+</Text>
+
+  </TouchableOpacity>
+
+  <TouchableOpacity onPress={() => setShowTimePicker(true)} style={styles.timeBox}>
+    <Text>{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+  </TouchableOpacity>
+
+  {showDatePicker && (
+    <DateTimePicker
+      value={date}
+      mode="date"
+      display="default"
+      onChange={handleDateChange}
+    />
+  )}
+
+  {showTimePicker && (
+    <DateTimePicker
+      value={time}
+      mode="time"
+      display="default"
+      onChange={handleTimeChange}
+    />
+  )}
+</View>
+
+    </View>
+
+      <View style={styles.inputContainer}>
+        <Icon name="location" size={30} color="#000" />
+        <TextInput 
+          style={styles.input} 
+          placeholder={t('place')} 
+          value={location} 
+          placeholderTextColor="#808080" 
+          onChangeText={setLocation} 
+        />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Icon name="document-text" size={30} color="#000" />
+        <TextInput 
+          style={styles.input} 
+          placeholder={t('description')} 
+          value={description} 
+          placeholderTextColor="#808080" 
+          multiline 
+          onChangeText={setDescription} 
+        />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Icon name="stopwatch" size={30} color="#000" />
+
+        <View style={styles.decisionPeriodContainer}>
+          <Text style={styles.label}></Text>
+          <TouchableOpacity onPress={() => setDecisionPeriod('test-3dk')} style={[styles.decisionOption, decisionPeriod === 'test-3dk' && styles.selectedDecision]}>
+            <Text>{t('decision_test')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setDecisionPeriod('1g')} style={[styles.decisionOption, decisionPeriod === '1g' && styles.selectedDecision]}>
+            <Text>{t('decision_1_day')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setDecisionPeriod('7g')} style={[styles.decisionOption, decisionPeriod === '7g' && styles.selectedDecision]}>
+            <Text>{t('decision_1_week')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setDecisionPeriod('30g')} style={[styles.decisionOption, decisionPeriod === '30g' && styles.selectedDecision]}>
+            <Text>{t('decision_1_month')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setInfoVisible(true)}>
+            <Icon name="help-circle-outline" size={24} color="#4CAF50" style={{  marginBottom:19 }}/>
+          </TouchableOpacity>
         </View>
       </View>
 
-      <View style={styles.inputContainer}>
-      <Icon name="location" size={30} color="#000" />
-        <TextInput style={styles.input} placeholder="Yer" value={location} placeholderTextColor="#808080" onChangeText={setLocation} />
-      </View>
-
-      <View style={styles.inputContainer}>
-      <Icon name="document-text" size={30} color="#000" />
-      <TextInput style={styles.input} placeholder="Açıklama" value={description} placeholderTextColor="#808080" multiline onChangeText={setDescription} />
-      </View>
-    
       <TouchableOpacity
         style={styles.addButton}
-        onPress={() => {
-          handleAddEvent();
-        }}>
-        <Text style={styles.addButtonText}>EKLE</Text>
+        onPress={handleAddEvent}>
+        <Text style={styles.addButtonText}>{t('add')}</Text>
       </TouchableOpacity>
+
+      <Modal
+        visible={infoVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setInfoVisible(false)}
+      >
+        <View style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)'
+        }}>
+          <View style={{
+            backgroundColor: 'white',
+            padding: 20,
+            borderRadius: 10,
+            maxWidth: '80%',
+            elevation: 5
+          }}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 10 }}>{t('what_is_decision_time')}</Text>
+            <Text>{t('what_is_decision_time_description')}</Text>
+            <TouchableOpacity onPress={() => setInfoVisible(false)} style={{ marginTop: 15, alignSelf: 'flex-end' }}>
+              <Text style={{ color: '#4CAF50', fontWeight: 'bold' }}>{t('ok')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
 export default AddEventScreen;
 
-
-
 const styles = StyleSheet.create({
   container:{
     flex: 1, 
     backgroundColor: '#f5f5f5', 
     padding: 20,
-
   },
   labelContainer:{
-    marginBottom: 15,
+    marginBottom: 10,
     flexDirection: 'row', 
-    alignItems: 'center',  // İkon ve metni aynı hizada tutar
-    marginBottom: 10, 
+    alignItems: 'center', 
   },
   inputContainer: {
-    marginBottom: 15,
+    marginBottom: 10,
     flexDirection: 'row', 
-    alignItems: 'center',  // İkon ve metni aynı hizada tutar
-    marginBottom: 10 
+    alignItems: 'center', 
+    marjinLeft: 5,
   },
   user:{
     fontSize: 20,
     fontWeight: "lighter",
     color: '#062925',
     marginBottom: 5,
-  },
-  dateContainer: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    padding: 8, 
-    borderRadius: 8, 
-    marginBottom: 10, 
-    marginLeft:3,
-    width:340,
-    height:45,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1, 
-    borderBottomColor: '#044a42',  
   },
   input: { 
     width: 340, 
@@ -269,11 +347,6 @@ const styles = StyleSheet.create({
     marginBottom: 10, 
     borderBottomWidth: 1, 
     borderBottomColor: '#044a42', 
-  },
-
-  rowContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
   },
 
   addButton: {
@@ -288,6 +361,48 @@ const styles = StyleSheet.create({
     fontSize: 16, 
     fontWeight: 'bold' 
   },
+  decisionPeriodContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexWrap: 'wrap',
+    marginTop: 15,
+  },
+  decisionOption: {
+    backgroundColor: '#e0e0e0',
+    padding: 8,
+    borderRadius: 6,
+    marginRight: 5,
+  },
+  selectedDecision: {
+    backgroundColor: '#4CAF50',
+  }, 
+  dateContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#044a42',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    width: 340,
+    height: 45,
+    marginBottom: 10,
+  },
+  
+  dateBox: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  
+  timeBox: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  
+
+
 
   
 });

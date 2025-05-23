@@ -1,114 +1,104 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTranslation } from 'react-i18next';
+import { API_URL } from '/Users/ranatunc/Desktop/timeBoxx/src/config/config.js'; 
 
 const JoinChannelPage = () => {
   const [channelCode, setChannelCode] = useState('');
   const navigation = useNavigation();
+  const { t } = useTranslation(); 
 
   const handleJoinChannel = async () => {
     if (channelCode.trim() === '') {
-      alert('Lütfen kanal kodunu girin.');
+      alert(t('join_channel.enter_channel_code'));
       return;
     }
-    
+
     try {
       const userId = await AsyncStorage.getItem('userId');
       if (!userId) {
-        alert('Kullanıcı kimliği bulunamadı!');
+        alert(t('join_channel.user_id_not_found'));
         return;
       }
-  
-      // Kullanıcı bilgisini AsyncStorage'dan al
+
       const user = await AsyncStorage.getItem('user');
       if (!user) {
-        alert('Kullanıcı bilgisi bulunamadı!');
+        alert(t('join_channel.user_info_not_found'));
         return;
       }
-  
+
       const parsedUser = JSON.parse(user);
-      const username = parsedUser.username;  // Kullanıcı adını al
-  
-      // Kanal koduna göre kanal bilgilerini al
-      const channelResponse = await fetch(`http://localhost:3000/api/channel-by-code/${channelCode}`);
+      const username = parsedUser.username;
+
+      const channelResponse = await fetch(`${API_URL}/api/channel-by-code/${channelCode}`);
       const channelData = await channelResponse.json();
-  
+
       if (!channelResponse.ok || !channelData || !channelData._id) {
-        alert('Kanal bulunamadı!');
+        alert(t('join_channel.channel_not_found'));
         return;
       }
-  
-      const channelId = channelData._id; // Kanal ID
-  
-      // Kanala katılma isteği gönder
-      const response = await fetch('http://localhost:3000/api/join-channel', {
+
+      const channelId = channelData._id;
+
+      const response = await fetch(`${API_URL}/api/join-channel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ channelId, userId }),
       });
-  
+
       const text = await response.text();
-      console.log('Kanala katılma cevabı:', text);
-  
+
       if (response.ok) {
-        alert('Kanala başarıyla katıldınız!');
+        alert(t('join_channel.joined_successfully'));
         navigation.navigate('MyChannelsPage', { refresh: true });
       } else {
-        console.error('Kanala katılma hatası:', text);
-        alert(`Hata: ${text}`);
+        alert(t('join_channel.join_channel_error'));
       }
-  
-      // Bildirim oluşturma
+      
       const notificationData = {
-        title: 'Yeni Katılımcıı !!📣',
-        message: `Kanala ${username} kişisi katıldı.`,  // Burada kullanıcı adını kullandık
-        userId, 
-        channelId: channelId, 
+        titleKey: 'join_channel.new_participant_notification_title', 
+        messageKey: 'join_channel.new_participant_notification_message', 
+        messageParams: { username },
+        userId,
+        channelId,
       };
-  
-      const notificationResponse = await fetch('http://localhost:3000/api/notifications', {
+
+      const notificationResponse = await fetch(`${API_URL}/api/notifications`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(notificationData),
       });
-  
+
       const notificationResponseData = await notificationResponse.json();
       if (notificationResponse.ok) {
-        console.log('Bildirim başarıyla oluşturuldu:', notificationResponseData);
       } else {
-        console.error('Bildirim hatası:', notificationResponseData.message);
       }
-  
+
     } catch (error) {
-      console.error('Sunucu hatası:', error);
-      alert('Sunucu hatası! Lütfen tekrar deneyin.');
+      alert(t('join_channel.server_error'));
     }
   };
-  
-  
 
   return (
     <View style={styles.container}>
-      {/* Kanal Kodu Girişi */}
       <TextInput
         style={styles.input}
-        placeholder="Kanal Kodu"
+        placeholder={t('join_channel.channel_code')}
         value={channelCode}
         onChangeText={setChannelCode}
       />
 
-      {/* Kanala Katıl Butonu */}
       <TouchableOpacity style={styles.joinButton} onPress={handleJoinChannel}>
-        <Text style={styles.joinButtonText}>Katıl</Text>
+        <Text style={styles.joinButtonText}>{t('join_channel.join')}</Text>
       </TouchableOpacity>
 
-      {/* Kanal Oluştur Sayfasına Git */}
       <TouchableOpacity
         style={styles.createChannelButton}
         onPress={() => navigation.navigate('CreateChannelPage')}
       >
-        <Text style={styles.createChannelButtonText}>Kanal Oluştur</Text>
+        <Text style={styles.createChannelButtonText}>{t('join_channel.create_channel')}</Text>
       </TouchableOpacity>
     </View>
   );

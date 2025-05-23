@@ -6,11 +6,8 @@ import ProfilePage from '../screens/Profile/ProfilePage';
 import EditProfilePage from '../screens/Profile/EditProfilePage'
 import MyChannelsPage from '../screens/Channel/MyChannelsPage';
 import CreateChannelPage from '../screens/Channel/CreateChannelPage'
-import ChatPage from '../screens/Chat/ChatPage';
 import { SvgXml } from 'react-native-svg';
 import AddEventScreen from '../screens/Home/AddEventScreen';
-import LocationPage from '../screens/Profile/LocationPage';
-import LanguagePage from '../screens/Profile/LanguagePage';
 import PrivacyAndSecurityPage from '../screens/Profile/PrivacyAndSecurityPage';
 import GoalsPage from '../screens/Goals/GoalsPage';
 import ChannelDetailPage from '../screens/Channel/ChannelDetailPage'
@@ -20,16 +17,17 @@ import {TouchableOpacity , Text, View} from 'react-native';
 import NeedPage from '../screens/Need/NeedPage';
 import EventDetailPage from '../screens/Home/EventDetailPage';
 import AddNeedPage from '../screens/Need/AddNeedPage'
-import ChoiceNeedPage from '../screens/Need/ChoiceNeedPage'
 import NeedDetailPage from '../screens/Need/NeedDetailPage'
 import { useNavigation } from "@react-navigation/native";
 import { FontAwesome } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import EventNotification from '../screens/Home/EventNotification'
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import EventParticipantsList from '../screens/Home/EventParticipantsList'
 import GoalsDetailPage from '../screens/Goals/GoalsDetailPage';
-import PasswordPage from '../screens/Profile/PasswordPage'
+import PasswordPage from '../screens/Profile/PasswordPage';
+import EventListPage from '../screens/Home/EventListPage';
+import { useTranslation } from 'react-i18next';
+import { API_URL } from '/Users/ranatunc/Desktop/timeBoxx/src/config/config.js'; 
 
 const notificationIcon = '<svg xmlns="http://www.w3.org/2000/svg" id="Layer_1" data-name="Layer 1" viewBox="0 0 24 24"><path d="m.212,4.908c-.226-.159-.279-.471-.12-.696C1.552,2.143,4.009.729,7.396.011c.267-.051.535.114.593.386.058.27-.115.535-.386.593-3.133.664-5.385,1.942-6.695,3.799-.097.139-.252.212-.408.212-.1,0-.2-.029-.288-.092Zm20.677,10.269l-3.959,6.447c-.803,1.308-2.138,2.16-3.663,2.341-.2.023-.398.035-.597.035-1.242,0-2.424-.475-3.349-1.322-.804.805-1.923,1.322-3.061,1.322s-2.208-.443-3.012-1.248c-.805-.804-1.248-1.874-1.248-3.012s.494-2.241,1.298-3.045l-1.812-1.809C.402,13.804-.117,12.312.06,10.791c.178-1.521,1.027-2.855,2.332-3.66l6.064-3.742c3.365-2.136,7.647-1.767,10.597.851l2.094-2.094c.195-.195.512-.195.707,0s.195.512,0,.707l-2.091,2.091c2.515,2.795,2.993,6.933,1.126,10.232Zm-12.269,6.831l-4.631-4.624c-.616.615-.989,1.485-.989,2.356s.339,1.689.955,2.305c1.23,1.232,3.434,1.196,4.665-.037Zm11.408-7.339c1.716-3.032,1.188-6.889-1.291-9.364-1.522-1.52-3.516-2.304-5.531-2.304-1.45,0-2.911.405-4.218,1.235l-6.07,3.746c-1.043.643-1.723,1.709-1.864,2.924-.141,1.215.274,2.407,1.141,3.272l7.667,7.655c.869.867,2.071,1.284,3.288,1.138,1.22-.144,2.287-.826,2.93-1.871l3.949-6.432Zm3.586,1.344c-.27-.062-.538.106-.601.374-.759,3.268-2.001,5.46-3.797,6.702-.228.157-.284.469-.127.695.097.141.253.216.411.216.099,0,.197-.028.284-.089,2.01-1.391,3.385-3.777,4.203-7.298.062-.27-.105-.538-.374-.601Z"/></svg>';
 
@@ -57,64 +55,54 @@ const globalHeaderOptions = {
   headerTintColor: 'white', // Geri butonu ve ikon rengi
 };
 
-
 const HomeStack = () => {
+  const { t } = useTranslation();
   const [hasNewNotification, setHasNewNotification] = useState(false);
 
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        const userId = await AsyncStorage.getItem('userId'); // Kullanıcı ID'yi al
+        const userId = await AsyncStorage.getItem('userId');
+    
         if (!userId) {
-          console.error("Kullanıcı ID bulunamadı!");
+          console.error(t('user_ID_not_found'));
           return;
         }
+    
+        // API_URL ve userId'yi logla
+        const response = await fetch(`${API_URL}/api/notifications/${userId}`);
   
-        const response = await fetch(`http://localhost:3000/api/notifications/${userId}`);
+    
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+    
         const data = await response.json();
+    
         const unreadExists = data.some((notif) => !notif.isRead);
         setHasNewNotification(unreadExists);
       } catch (error) {
-        console.error("Bildirimler alınamadı:", error);
+        console.error(t('error_fetching_notifications'), error);
       }
     };
-
+    
+  
     fetchNotifications();
   }, []);
+  
 
   return (
     <Stack.Navigator screenOptions={globalHeaderOptions}>
       <Stack.Screen 
         name="HomePage" 
         component={HomePage} 
-        options={({ navigation }) => ({  // 🎯 navigation'ı doğrudan alıyoruz
-          title: 'Etkinlik Takvimi', 
-          headerRight: () => (
-            <TouchableOpacity onPress={() => navigation.navigate('EventNotification')}>
-              <View style={{ position: "relative" }}>
-                <FontAwesome name="bell" size={24} color='white' />
-                {hasNewNotification && (
-                  <View
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      right: 0,
-                      backgroundColor: "red",
-                      width: 10,
-                      height: 10,
-                      borderRadius: 5,
-                    }}
-                  />
-                )}
-              </View>
-            </TouchableOpacity>
-          ),
-        })} 
+        options={{title: t('event_calendar') ,headerLeft: () => null,}} 
       />
       <Stack.Screen 
         name="AddEventScreen" 
         component={AddEventScreen} 
-        options={{ title: 'Etkinlik Ekle' }} 
+        options={{ title: t('add_event'), 
+      }} 
       />
       <Stack.Screen 
         name="EventDetailPage" 
@@ -125,33 +113,28 @@ const HomeStack = () => {
         name="EventNotification" 
         component={EventNotification} 
         options={{ title: '' }} 
-      />      
+      /> 
       <Stack.Screen 
-      name="EventParticipantsList" 
-      component={EventParticipantsList} 
-      options={{ title: 'Katılımcılar' }} 
-    />
+    name="EventListPage" 
+    component={EventListPage} 
+    options={{ title: '' }} 
+  />
     </Stack.Navigator>
   );
 };
 
 const NeedStack = () => {
+  const { t } = useTranslation();
   return (
     <Stack.Navigator screenOptions={globalHeaderOptions}>   
       <Stack.Screen 
         name="NeedPage" 
         component={NeedPage} 
         options={{ 
-          title: 'Yapılacaklar', 
+          title:t('need') , 
+          headerLeft: () => null,
         }} 
-      />
-       <Stack.Screen 
-        name="ChoiceNeedPage" 
-        component={ChoiceNeedPage} 
-        options={{ 
-          title: '', 
-        }} 
-      />      
+      />    
       <Stack.Screen 
       name="AddNeedPage" 
       component={AddNeedPage} 
@@ -170,13 +153,15 @@ const NeedStack = () => {
   );
 };
 const GoalsStack = () => {
+  const { t } = useTranslation();
   return (
     <Stack.Navigator screenOptions={globalHeaderOptions}>   
       <Stack.Screen 
         name="GoalsPage" 
         component={GoalsPage} 
         options={{ 
-          title: 'Hedefler', 
+          title:t('goals') , 
+          headerLeft: () => null,
         }} 
       />
       <Stack.Screen 
@@ -193,33 +178,43 @@ const GoalsStack = () => {
   );
 };
 const ProfileStack = ({ setIsLoggedIn }) => {
+  const { t } = useTranslation();
   return (
     <Stack.Navigator screenOptions={globalHeaderOptions}>
       <Stack.Screen 
         name="ProfilePage" 
-        options={{ headerShown: false }} // Profil sayfasında başlık gizleniyor
+        options={{ 
+          title: ' ' ,
+          headerShown: true ,
+          headerStyle: {
+            backgroundColor: '#f5f5f5',
+            elevation: 0, // Android'de gölgeyi kaldırır
+            shadowOpacity: 0, // iOS'ta gölgeyi kaldırır
+            borderBottomWidth: 0, 
+          },
+        }} // Profil sayfasında başlık gizleniyor
       >
         {() => <ProfilePage setIsLoggedIn={setIsLoggedIn} />}
       </Stack.Screen>
       <Stack.Screen 
         name="EditProfilePage" 
         component={EditProfilePage} 
-        options={{ title: 'Edit Profile' }} // Düzenleme sayfasının başlığı
+        options={{  title:t('edit_profile') }} // Düzenleme sayfasının başlığı
       />
       <Stack.Screen 
         name="MyChannelsPage" 
         component={MyChannelsPage} 
-        options={{ title: 'My Channels' }} 
+        options={{ title:t('my_channels_profile')}} 
       />
       <Stack.Screen 
         name="PasswordPage" 
         component={PasswordPage} 
-        options={{ title: 'Şifre' }} 
+        options={{ title:t('password') }} 
       />
       <Stack.Screen 
         name="CreateChannelPage" 
         component={CreateChannelPage} 
-        options={{ title: 'Kanal Oluştur' }} 
+        options={{ title:t('create_channel')}} 
       />
       <Stack.Screen 
         name="ChannelDetailPage" 
@@ -229,22 +224,12 @@ const ProfileStack = ({ setIsLoggedIn }) => {
       <Stack.Screen 
         name="JoinChannelPage" 
         component={JoinChannelPage} 
-        options={{ title: 'Kanala Katıl' }} 
-      />
-      <Stack.Screen 
-        name="LocationPage" 
-        component={LocationPage} 
-        options={{ title: 'Konum' }} 
-      />
-      <Stack.Screen 
-        name="LanguagePage" 
-        component={LanguagePage} 
-        options={{ title: 'Diller' }} 
-      />
+        options={{ title:t('join_channel_title') }}     
+       />
       <Stack.Screen 
         name="PrivacyAndSecurityPage" 
         component={PrivacyAndSecurityPage} 
-        options={{ title: 'Gizlilik ve Güvenlik' }} 
+        options={{ title:t('privacy_security')  }} 
       />
       <Stack.Screen 
         name="GoalsPage" 
@@ -258,39 +243,34 @@ const ProfileStack = ({ setIsLoggedIn }) => {
 
 
 const UserStack = ({ setIsLoggedIn }) => {
+  const { t } = useTranslation();
+
   return (
-    <Tab.Navigator screenOptions={{ headerShown: false }} initialRouteName="Home">
+    <Tab.Navigator screenOptions={{ headerShown: false }} initialRouteName={t("home") }>
       {/* HomeStack'i burada kullanıyoruz */}
       <Tab.Screen 
-        name="Home" 
+        name={t("home") }
         component={HomeStack} // Sadece 'component' kullanılıyor
         options={{
           tabBarIcon: () => <SvgXml xml={homeIcon} width="24" height="24" />
         }} 
       />
       <Tab.Screen 
-        name="Need" 
+        name={t("need") }
         component={NeedStack} 
         options={{
           tabBarIcon: () => <SvgXml xml={listIcon} width="24" height="24" />
         }} 
       />
       <Tab.Screen 
-        name="Chat" 
-        component={ChatPage} 
-        options={{
-          tabBarIcon: () => <SvgXml xml={bubbleIcon} width="24" height="24" />
-        }} 
-      />
-      <Tab.Screen 
-        name="Goals" 
+        name={t("goals") }
         component={GoalsStack} 
         options={{
           tabBarIcon: () => <SvgXml xml={incomeIcon} width="24" height="24" />
         }} 
       />
       <Tab.Screen 
-        name="Profile" 
+        name={t("profile") }
         options={{
           tabBarIcon: () => <SvgXml xml={userIcon} width="24" height="24" />
         }}
@@ -305,4 +285,3 @@ const UserStack = ({ setIsLoggedIn }) => {
 
 
 export default UserStack;
-

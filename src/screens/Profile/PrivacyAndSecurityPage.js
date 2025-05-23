@@ -12,7 +12,6 @@ const PrivacyAndSecurityPage = () => {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.title}>{t('privacy_security')}</Text>
 
         <Text style={styles.subTitle}>{t('introduction')}</Text>
         <Text style={styles.paragraph}>{t('introduction_text')}</Text>

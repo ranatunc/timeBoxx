@@ -2,7 +2,7 @@
 
 Build Your Community, Plan Time, Create Events, Share Tasks, Achieve Goals!
 
-![timeBoxx Preview](./tr.png)
+![timeBoxx Preview](./assets/presentation/en.png)
 
 ## 🌟 What is timeBoxx?
 
@@ -17,7 +17,18 @@ Build Your Community, Plan Time, Create Events, Share Tasks, Achieve Goals!
 - ✅ **Task Management:** Create and assign tasks, track completion status, and keep your team aligned in real time.
 - 📊 **Progress & Contribution Metrics:** Track individual contributions and team progress with built-in analytics.
 
+<<<<<<< HEAD
 ## ✨ Motto
 
 > “Time is in your hands.  
 > The journey starts now!”
+=======
+## 📱 App UI Preview
+
+See the interface in the image above.
+
+## ✨ Motto
+
+> “Time is in your hands.  
+> The journey starts now!”
+>>>>>>> ebf0fcc (First Version)
