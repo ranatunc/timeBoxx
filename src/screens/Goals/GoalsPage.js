@@ -10,18 +10,18 @@ import { ChannelContext } from '../../context/ChannelContext';
 import { AntDesign } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { API_URL } from '/Users/ranatunc/Desktop/timeBoxx/src/config/config.js'; 
-
+import { GoalsContext } from '../../context/GoalContext';
 
 
 const GoalsPage = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(true);
   const { t } = useTranslation();
   const { activeChannelId } = useContext(ChannelContext); 
   const [channelId, setChannelId] = useState(activeChannelId);
-  
+  const { goals, setGoals } = useContext(GoalsContext);
+
   useEffect(() => {
     if (activeChannelId) {
       setChannelId(activeChannelId);
@@ -77,7 +77,15 @@ const GoalsPage = () => {
     
     return colors[Math.floor(Math.random() * colors.length)];
   };
+  const normalizeGoalType = (rawType) => {
+    const val = (rawType || '').toLowerCase();
+  
+    if (val.includes('finans') || val.includes('finance') || val.includes('financial')) return 'financial';
 
+  
+    return 'unknown';
+  };
+  
   return (
     <View style={styles.container }>
         {channelId ? (
@@ -85,15 +93,16 @@ const GoalsPage = () => {
               {goals.length > 0 ? (
                 <FlatList
                   contentContainerStyle={styles.listContainer}
-                  data={goals.reverse()}
+                  data={[...goals].reverse()}
                   keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
+                  
                   renderItem={({ item }) => {
                     const progress = (item.amount > 0 && item.SavedAmount >= 0)
                       ? item.SavedAmount / item.amount
                       : 0;
                   
                     const isComplete = progress >= 1;
-                  
+ 
                     return (
                       <TouchableOpacity
                         style={[
@@ -105,7 +114,6 @@ const GoalsPage = () => {
                             goalId: item.id,
                             channelId: item.channelId,
                             goal: item,
-                            setGoals
                           })
                         }
                       >
@@ -113,7 +121,8 @@ const GoalsPage = () => {
                                 <View style={[styles.colorBar, { backgroundColor: getRandomColor() }]} />
                                 <View style={styles.goalInfo}>
                                       <Text style={styles.goalText}>{t('goals_page.title')} : {item.title}</Text>
-                                      <Text style={styles.goalText}>{t('goals_page.type')} : {item.selectedType}</Text>
+                                      <Text style={styles.goalText}>
+                                        {t('goals_page.type')} : {t(`goal_types.${normalizeGoalType(item.selectedType)}`)} </Text>
                                       <Text style={styles.goalText}>{t('goals_page.description')} : {item.description}</Text>
                                 </View>
                               <View style={styles.chartColumn}>

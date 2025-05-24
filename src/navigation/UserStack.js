@@ -214,7 +214,7 @@ const ProfileStack = ({ setIsLoggedIn }) => {
       <Stack.Screen 
         name="CreateChannelPage" 
         component={CreateChannelPage} 
-        options={{ title:t('create_channel')}} 
+        options={{ title:t('create_channel_title')}} 
       />
       <Stack.Screen 
         name="ChannelDetailPage" 

@@ -1361,7 +1361,6 @@ app.post('/api/goals', async (req, res) => {
     const creatorUsername = user.username;
 
     const goalData = req.body;
-    console.log('Received Goal Data:', goalData); // Burada gelen veriyi kontrol et
 
     const goal = new Goal({
       title,  

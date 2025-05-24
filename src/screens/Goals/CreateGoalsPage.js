@@ -18,7 +18,7 @@ const CreateGoalsPage = () => {
   const [date, setDate] = useState(new Date());
   const [description, setDescription] = useState('');
   const [title, setTitle] = useState('');
-  const [selectedType, setSelectedType] = useState(t('create_goals_page.default_type')); 
+  const [selectedType, setSelectedType] = useState('financial');
   const [channelId, setChannelId] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(Platform.OS === 'ios');
 
@@ -88,7 +88,7 @@ const CreateGoalsPage = () => {
       Alert.alert(t('create_goals_page.error_fill_all_fields'));
       return;
     }
-
+    
     const newGoal = {
       title,
       selectedType,
@@ -169,7 +169,7 @@ const CreateGoalsPage = () => {
         <Icon name="stats-chart" size={30} color="#000" />
         <TextInput
           style={[styles.input, { backgroundColor: '#dcdcdc' }]}
-          value={selectedType}
+          value={t(`goal_types.${selectedType}`)}
           editable={false}
           placeholder={t('create_goals_page.placeholder_type')}
           placeholderTextColor="#808080"

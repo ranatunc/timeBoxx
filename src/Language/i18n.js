@@ -38,9 +38,6 @@ const resources = {
       loginFailed: "Login failed!",
       serverError: "An error occurred. Please try again.",
       dontHaveAccountSignup: "Don't have an account? Sign Up!",
-
-      
-
      welcome: "Welcome",
       save: "Save",
       phone: "Phone",
@@ -104,6 +101,7 @@ const resources = {
 
       event_calendar:"Event Calender",
       join_channel_title:"Join Channel",
+      create_channel_title:"Create Channel",
       //ADDEVENTSCREEN
       place:"Place",
       description:"Description",
@@ -333,7 +331,7 @@ const resources = {
         server_error: "Server error! Please try again.",
         entertainment:"Entertainment",
         games:"Games",
-        spor: "Spor",
+        spor: "Sports",
         music : "Music",
         family: "Family", 
         friends : "Friends",
@@ -388,6 +386,9 @@ const resources = {
         },
 
       //GOALS----------------------------------------------------------------------------------------------
+      goal_types: {
+        "financial": "Finance",
+      },
       goals_page:{
         no_goals_text: "Start adding your goals..",
         open_channel_message: "Please log in to a channel to view goals.",
@@ -420,7 +421,8 @@ const resources = {
         placeholder_type: "Select Type",
         placeholder_amount: "Amount",
         placeholder_description: "Description",
-        save_button: "Save"
+        save_button: "Save",
+        selectedType:"Finance",
       },
       goals_detail_page: {
         progress_label: "Completion:",
@@ -619,7 +621,8 @@ const resources = {
       contact_text: "Gizlilik politikamızla ilgili sorularınız için bizimle şu adresten iletişime geçebilirsiniz:",
       event_calendar:"Etkinlik Takvimi",
       join_channel_title:"Kanala Katıl",
-      
+      create_channel_title:"Kanal Oluştur",
+
       //ADDEVENTSCREEN
       place:"Yer",
       description:"Açıklama",
@@ -849,7 +852,7 @@ const resources = {
         server_error: "Sunucu hatası! Lütfen tekrar deneyin.",
         entertainment:"Eğlence",
         games:"Oyun",
-        spor: "Sports",
+        spor: "Spor",
         music : "Müzik",
         family: "Aile",
         friends : "Arkadaş",
@@ -904,6 +907,9 @@ const resources = {
       },
 
       //GOALS----------------------------------------------------------------------------------------------
+      goal_types: {
+        financial: "Finans",
+      },
       goals_page:{
         no_goals_text: "Hedeflerinizi eklemeye başlayın..",
         open_channel_message: "Hedefleri görüntüleyebilmek için lütfen kanalda oturum açınız.",
@@ -915,6 +921,7 @@ const resources = {
         title: "Başlık",
         type: "Tür",
         description: "Açıklama",
+
       },
       create_goals_page: {
         default_type: "Finans",
@@ -936,8 +943,11 @@ const resources = {
         placeholder_type: "Tür Seçin",
         placeholder_amount: "Miktar",
         placeholder_description: "Açıklama",
-        save_button: "Kaydet"
+        save_button: "Kaydet",
+
+
       },
+
       goals_detail_page: {
         progress_label: "Tamamlanma:",
         contribution_placeholder: "Katkı miktarı...",

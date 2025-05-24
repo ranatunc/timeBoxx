@@ -8,12 +8,15 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import { API_URL } from '/Users/ranatunc/Desktop/timeBoxx/src/config/config.js'; 
+import { GoalsContext } from '../../context/GoalContext';
+import { useContext } from 'react';
 
 
 const GoalsDetailPage = () => {
   const route = useRoute();  
   const navigation = useNavigation();
-  const { goal, goalId, setGoals, channelId } = route.params;
+  const { goal, goalId, channelId } = route.params;
+  const { setGoals } = useContext(GoalsContext);
   const [tasks, setTasks] = useState(goal.tasks || []); 
   const [contribution, setContribution] = useState('');
   const [savedAmount, setSavedAmount] = useState(goal.savedAmount || 0);
@@ -36,6 +39,16 @@ const GoalsDetailPage = () => {
   }, []);
   
 
+  const normalizeGoalType = (rawType) => {
+    const val = (rawType || '').toLowerCase();
+  
+    if (val.includes('finans') || val.includes('finance') || val.includes('financial')) return 'financial';
+
+  
+    return 'unknown';
+  };
+  const isFinanceType = normalizeGoalType(goal.selectedType) === 'financial';
+  
   const formatCurrency = (amount, language = 'tr') => {
     return new Intl.NumberFormat(language, {
       style: 'currency',
@@ -206,7 +219,7 @@ const GoalsDetailPage = () => {
   );
 };
 
-  const progress = goal.selectedType === 'Finans'
+  const progress = isFinanceType
     ? savedAmount / goal.amount
     : tasks.length > 0
       ? tasks.filter(t => t.completed).length / tasks.length
@@ -223,18 +236,20 @@ const GoalsDetailPage = () => {
   }, [navigation, goal, loggedUserId]);
   
 
+
+  
   return (
     <View style={styles.container}>
       <View style={styles.headerContainer}>
         <Text style={styles.header}>{goal.title}</Text>
-        {goal.selectedType === 'Finans' && (
+        {isFinanceType && (
           <TouchableOpacity onPress={() => setModalVisible(true)}>
             <AntDesign name="user" size={24} color="black" />
           </TouchableOpacity>
         )}
       </View>
 
-      <Text style={styles.detailText}>{t('goals_detail_page.goal_type_label')} {goal.selectedType}</Text>
+      <Text style={styles.detailText}>{t('goals_detail_page.goal_type_label')}{t(`goal_types.${normalizeGoalType(goal.selectedType)}`)}</Text>
       <View style={styles.detailRow}>
           <Icon name="person" size={20} color="#000" />
           <Text style={styles.menuItemText}>{goal.username}</Text>
@@ -262,7 +277,7 @@ const GoalsDetailPage = () => {
         </View>
       </View>
 
-      {goal.selectedType === "Finans" && (
+      {isFinanceType && (
         savedAmount >= goal.amount ? (
           <>
                 <Text style={styles.detailText}>{t('goals_detail_page.target_label')} {formatCurrency(goal.amount, i18n.language)}</Text>
@@ -308,7 +323,7 @@ const GoalsDetailPage = () => {
             <View style={styles.modalContent}>
               <Text style={styles.modalHeader}>{t('goals_detail_page.contributors_title')}</Text>
               <FlatList
-                  data={contributions.reverse()}
+                  data={contributions}
                   keyExtractor={(_, index) => index.toString()}
                   renderItem={({ item }) => (
                     <Text style={styles.modalItem}>
